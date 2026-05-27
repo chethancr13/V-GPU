@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+websockets
+numpy
+pyopengl
+opencv-python
+moderngl
+pillow
+asyncio
+docker
