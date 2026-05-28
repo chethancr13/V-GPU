@@ -81,11 +81,16 @@ class ComputeEngine:
         latency = random.uniform(10, 100)
         throughput = batch_size / (latency / 1000)
 
-        return {
+        res = {
             "latency_ms": latency,
             "throughput_req_per_sec": throughput,
             "memory_used": random.uniform(100, 1000)  # MB
         }
+        if "agent_logs" in job:
+            res["agent_logs"] = job["agent_logs"]
+        if "agent_findings" in job:
+            res["agent_findings"] = job["agent_findings"]
+        return res
 
 
 class GraphicsEngine:

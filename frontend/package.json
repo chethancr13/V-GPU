@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.14",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@tauri-apps/cli": "^2.11.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",

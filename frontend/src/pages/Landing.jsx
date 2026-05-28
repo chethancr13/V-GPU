@@ -307,7 +307,7 @@ export default function Landing() {
             <header style={{ position: 'absolute', top: 0, left: 0, width: '100%', padding: '2rem 3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10, boxSizing: 'border-box' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.25rem', fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>
                     <Cpu size={24} color="var(--accent)" style={{ filter: 'drop-shadow(0 0 8px var(--accent))' }} />
-                    OPEN<span style={{ color: 'var(--accent)' }}>VGPU</span>
+                    V-<span style={{ color: 'var(--accent)' }}>GPU</span>
                 </div>
                 <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
                     <span onClick={() => nav('/dashboard')} style={{ color: '#c9d1d9', cursor: 'pointer', transition: 'color 0.2s', fontSize: '0.9rem', fontWeight: 500 }} onMouseEnter={e => e.target.style.color = '#fff'} onMouseLeave={e => e.target.style.color = '#c9d1d9'}>Cluster Dashboard</span>
@@ -402,7 +402,7 @@ export default function Landing() {
 
                 {/* Footer branding */}
                 <footer style={{ marginTop: '10rem', color: '#30363d', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                    <div>OpenVGPU Platform Cluster Console • Enterprise Core 1.0</div>
+                    <div>V-GPU Platform Cluster Console • Enterprise Core 1.0</div>
                     <div>High-Fidelity WebGL-projected 3D hardware nodes simulation active</div>
                 </footer>
 

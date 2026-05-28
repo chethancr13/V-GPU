@@ -69,7 +69,7 @@ class VGPUScheduler:
                     if vgpu_id:
                         job["vgpu_id"] = vgpu_id
                         job["scheduled_at"] = time.time()
-                        job["status"] = "running"
+                        job["status"] = "RUNNING"
                         
                         # Initialize job progress variables
                         # Estimate total work required (in seconds)
@@ -121,9 +121,9 @@ class VGPUScheduler:
                     # Actually calculate the final metrics
                     result = await compute_engine.calculate_job_metrics(job)
                     job["result"] = result
-                    job["status"] = "Completed"
+                    job["status"] = "COMPLETED"
                 except Exception as e:
-                    job["status"] = "Failed"
+                    job["status"] = "FAILED"
                     job["error"] = str(e)
                 
                 job["execution_time"] = time.time() - job["scheduled_at"]
@@ -182,7 +182,7 @@ class VGPUScheduler:
     def preempt_job(self, job_id: str) -> bool:
         if job_id in self.running_jobs:
             job = self.running_jobs[job_id]
-            job["status"] = "preempted"
+            job["status"] = "PREEMPTED"
             self.completed_jobs.append(job)
             
             # Remove from assignments

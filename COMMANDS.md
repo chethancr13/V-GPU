@@ -1,4 +1,4 @@
-# 🚀 OpenVGPU Command Cheat Sheet
+# 🚀 V-GPU Command Cheat Sheet
 
 This guide contains all the commands you need to manage your Virtual GPU environment, run ML models, and clean up Docker containers.
 
@@ -28,7 +28,7 @@ python3 vgpu_launcher.py run my_ml_model.py auto "datasets/my_data.csv"
 ```
 
 ## 3. Parallel Computing Cluster
-OpenVGPU supports multi-node parallel orchestration with automated load balancing.
+V-GPU supports multi-node parallel orchestration with automated load balancing.
 
 **Run on Parallel Cluster (Split Workload):**
 ```bash
@@ -68,4 +68,4 @@ docker ps -a -q --filter "name=vgpu-" | xargs docker rm -f
 - **Desktop Monitor**: Opens automatically on `run`.
 
 ---
-*OpenVGPU - Professional AI Workstation isolation.*
+*V-GPU - Professional AI Workstation isolation.*

@@ -16,7 +16,7 @@ class VGPUInstance:
     container_id: Optional[str] = None
 
 class VGPUDevice:
-    def __init__(self, physical_gpu_id: int, total_vram: int = 8192, total_compute: float = 100.0):
+    def __init__(self, physical_gpu_id: int, total_vram: int = 32768, total_compute: float = 100.0):
         self.physical_gpu_id = physical_gpu_id
         self.total_vram = total_vram  # MB
         self.total_compute = total_compute  # %

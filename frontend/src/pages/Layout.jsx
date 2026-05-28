@@ -18,7 +18,7 @@ export default function Layout() {
             <aside style={{ width: '260px', background: 'var(--dark-gray)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: '1px solid var(--border)' }}>
                     <Cpu size={24} color="var(--accent)" />
-                    <span style={{ fontWeight: 800, letterSpacing: '0.05em', color: 'var(--text-primary)' }}>ZENITH</span>
+                    <span style={{ fontWeight: 800, letterSpacing: '0.05em', color: 'var(--text-primary)' }}>V-GPU</span>
                 </div>
                 
                 <nav style={{ flex: 1, padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -45,7 +45,7 @@ export default function Layout() {
 
                 <div style={{ padding: '2rem', borderTop: '1px solid var(--border)' }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-                        PROJECT ZENITH v2.0
+                        V-GPU v2.0
                     </div>
                 </div>
 

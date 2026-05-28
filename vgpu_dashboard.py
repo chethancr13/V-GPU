@@ -24,7 +24,7 @@ RED = "#f85149"
 class VGPUTickerDashboard:
     def __init__(self, root):
         self.root = root
-        self.root.title("OpenVGPU Professional Monitor")
+        self.root.title("V-GPU Professional Monitor")
         self.root.geometry("1100x750")
         self.root.configure(bg=BG_DARK)
 

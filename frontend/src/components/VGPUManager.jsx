@@ -20,8 +20,16 @@ function VGPUManager() {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams(data)
-    }).then(res => res.json()),
-    onSuccess: () => queryClient.invalidateQueries(['vgpus'])
+    }).then(res => {
+      if (!res.ok) {
+        return res.json().then(err => { throw new Error(err.detail || 'Failed to provision vGPU') })
+      }
+      return res.json()
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['vgpus'])
+      provisionMutation.reset()
+    }
   })
 
   const destroyMutation = useMutation({
@@ -88,7 +96,10 @@ function VGPUManager() {
                 max="4096"
                 step="256"
                 value={vram}
-                onChange={(e) => setVram(e.target.value)}
+                onChange={(e) => {
+                  setVram(e.target.value)
+                  provisionMutation.reset()
+                }}
                 style={{ 
                   width: '100%', 
                   accentColor: 'var(--accent)', 
@@ -116,7 +127,10 @@ function VGPUManager() {
                 max="100"
                 step="10"
                 value={compute}
-                onChange={(e) => setCompute(e.target.value)}
+                onChange={(e) => {
+                  setCompute(e.target.value)
+                  provisionMutation.reset()
+                }}
                 style={{ 
                   width: '100%', 
                   accentColor: 'var(--accent)', 
@@ -178,6 +192,11 @@ function VGPUManager() {
               <Plus size={16} />
               {provisionMutation.isLoading ? 'Provisioning node...' : 'Create vGPU'}
             </button>
+            {provisionMutation.isError && (
+              <div style={{ color: 'var(--red)', fontSize: '0.75rem', marginTop: '0.75rem', textAlign: 'center', lineHeight: '1.4' }}>
+                ⚠️ {provisionMutation.error.message}
+              </div>
+            )}
           </div>
         </div>
 

@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Dashboard from './components/Dashboard'
 import VGPUManager from './components/VGPUManager'
+import VMInspector from './components/VMInspector'
 import ComputeLab from './components/ComputeLab'
 import AIInference from './components/AIInference'
 import GraphicsViewer from './components/GraphicsViewer'
 import SchedulerView from './components/SchedulerView'
 import Logs from './components/Logs'
 import { 
-  LayoutDashboard, Server, Cpu, Brain, 
+  LayoutDashboard, Server, Box, Cpu, Brain, 
   Image as ImageIcon, Briefcase, FileText, Settings, 
   HelpCircle, Bell, Search, Cpu as CpuIcon
 } from 'lucide-react'
@@ -21,6 +22,7 @@ function App() {
   const tabs = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, component: Dashboard },
     { id: 'vgpu', name: 'vGPU Manager', icon: Server, component: VGPUManager },
+    { id: 'vm_inspector', name: 'VM Inspector', icon: Box, component: VMInspector },
     { id: 'compute', name: 'Compute Lab', icon: Cpu, component: ComputeLab },
     { id: 'ai', name: 'AI Inference', icon: Brain, component: AIInference },
     { id: 'graphics', name: 'Graphics Viewer', icon: ImageIcon, component: GraphicsViewer },
@@ -38,7 +40,7 @@ function App() {
         <aside style={{ width: '260px', background: 'var(--dark-gray)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', shrink: 0 }}>
           <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: '1px solid var(--border)' }}>
             <CpuIcon size={24} color="var(--accent)" />
-            <span style={{ fontWeight: 800, letterSpacing: '0.05em', color: 'var(--text-primary)', fontSize: '1.1rem' }}>OPENVGPU</span>
+            <span style={{ fontWeight: 800, letterSpacing: '0.05em', color: 'var(--text-primary)', fontSize: '1.1rem' }}>V-GPU</span>
           </div>
 
           <nav style={{ flex: 1, padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', overflowY: 'auto' }}>

@@ -7,7 +7,7 @@ import requests
 import webbrowser
 
 def start_backend():
-    print("🚀 Starting OpenVGPU Backend (Monolithic)...")
+    print("🚀 Starting V-GPU Backend (Monolithic)...")
     # Using uvicorn to serve the root FastAPI app
     backend_process = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"],

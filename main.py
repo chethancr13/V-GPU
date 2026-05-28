@@ -5,11 +5,13 @@ import shutil
 import uuid
 import random
 from typing import Optional, List, Dict
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from core.vgpu_driver import physical_gpus
+from core.scheduler import scheduler
+from core.isolation import isolation_manager
 from core.job_executor import MLJobExecutor
 
 app = FastAPI(title="V-GPU NVIDIA Control Plane (Monolith)")
@@ -33,6 +35,22 @@ os.makedirs(DATASETS_DIR, exist_ok=True)
 
 # --- MODELS & STATE ---
 executor = MLJobExecutor()
+
+@app.on_event("startup")
+async def startup_event():
+    # Start the scheduler's background queue processing loop
+    asyncio.create_task(scheduler.process_queue())
+
+    # Start the isolation manager's background enforcement loop
+    async def enforce_limits_loop():
+        while True:
+            try:
+                isolation_manager.enforce_limits()
+            except Exception as e:
+                print(f"Error enforcing limits: {e}")
+            await asyncio.sleep(1.0)
+            
+    asyncio.create_task(enforce_limits_loop())
 
 # Global state for tracking ML jobs & scheduling
 recent_jobs = []
@@ -71,13 +89,71 @@ async def list_vgpu():
         all_instances.extend(gpu.list_instances())
     return all_instances
 
+@app.get("/api/vgpu/{vgpu_id}/cpuz")
+async def get_vgpu_cpuz(vgpu_id: str):
+    target = None
+    for gpu in physical_gpus:
+        for inst in gpu.list_instances():
+            if inst["id"] == vgpu_id:
+                target = inst
+                break
+    if not target:
+        raise HTTPException(status_code=404, detail="vGPU Instance not found")
+        
+    cores = int(max(4, (target["compute_limit"] / 100) * 64))
+    vram_gb = target["vram_limit"] / 1024
+    
+    return {
+        "processor_name": f"NVIDIA Tensor-Core vGPU ZX-{int(target['compute_limit'] * 5)}",
+        "codename": "Zenith-Ampere v2",
+        "technology": "4nm TSMC FinFET",
+        "instructions": "Zenith-AVX512, CUDA 12.6, TensorRT 10.1, FP16 Tensor Cores",
+        "cores": cores,
+        "clocks": {
+            "core_speed": f"{1200 + int(target['compute_limit'] * 4)} MHz",
+            "memory_speed": "7000 MHz",
+            "bus_width": "384-bit"
+        },
+        "caches": {
+            "l1_data": f"{cores * 64} KB",
+            "l2_cache": "96 MB unified",
+            "l3_cache": f"{int(vram_gb * 32)} MB HBM3"
+        },
+        "virtual_os": "Ubuntu 22.04 LTS (Kernel 5.15.0-vGPU)",
+        "hypervisor": f"Zenith-VMM v2.4 (Docker {target['container_id'][:12] if target['container_id'] else 'Simulated'})",
+        "architecture": "Zenith-vArch 3.5"
+    }
+
 @app.post("/api/vgpu/provision")
-async def provision_vgpu(vram_mb: int = 4000, compute_pct: float = 50.0):
+async def provision_vgpu(request: Request, vram_mb: Optional[int] = None, compute_pct: Optional[float] = None):
+    # Retrieve form data if sent (e.g. from VGPUManager.jsx)
+    form_data = await request.form()
+    
+    # Resolve vram_mb
+    resolved_vram = vram_mb
+    if resolved_vram is None and "vram_mb" in form_data:
+        try:
+            resolved_vram = int(form_data["vram_mb"])
+        except ValueError:
+            pass
+    if resolved_vram is None:
+        resolved_vram = 4000
+        
+    # Resolve compute_pct
+    resolved_compute = compute_pct
+    if resolved_compute is None and "compute_pct" in form_data:
+        try:
+            resolved_compute = float(form_data["compute_pct"])
+        except ValueError:
+            pass
+    if resolved_compute is None:
+        resolved_compute = 50.0
+
     # Auto-select the first GPU with enough capacity
     for gpu in physical_gpus:
         try:
             # Launcher sends 0-100. Driver expects 0-100.
-            instance_id = gpu.create_vgpu_instance(vram_mb, compute_pct)
+            instance_id = gpu.create_vgpu_instance(resolved_vram, resolved_compute)
             return {"vgpu_id": instance_id, "status": "created"}
         except ValueError:
             continue
@@ -167,20 +243,22 @@ async def run_compute_job(
     priority: str = Form(...)
 ):
     job_id = str(uuid.uuid4())
-    jobs_store[job_id] = {
+    job = {
         "id": job_id,
-        "status": "COMPLETED",
-        "execution_time": random.uniform(0.12, 0.45),
-        "result": {
-            "gflops_achieved": random.uniform(2500.0, 4800.0)
-        }
+        "type": "compute",
+        "job_type": job_type,
+        "size": size,
+        "priority": priority,
+        "submitted_at": time.time(),
+        "status": "PENDING"
     }
+    jobs_store[job_id] = job
+    await scheduler.schedule_job(job)
     return {"job_id": job_id, "status": "Submitted"}
 
 @app.post("/api/jobs/inference")
 async def run_inference_job(req: InferenceRequest):
     job_id = str(uuid.uuid4())
-    lat = random.uniform(8.0, 15.0) * req.batch_size
     
     agent_logs = [
         "🤖 AI Agent status: [ACTIVE] Ingesting neural context...",
@@ -220,17 +298,19 @@ async def run_inference_job(req: InferenceRequest):
             agent_logs.append(f"⚠️ Dataset path not found: {file_path}")
             agent_findings = "Target dataset reference could not be localized on current cluster block storage."
             
-    jobs_store[job_id] = {
+    job = {
         "id": job_id,
-        "status": "COMPLETED",
-        "result": {
-            "latency_ms": lat,
-            "throughput_req_per_sec": (1000.0 / lat) * req.batch_size if lat > 0 else 0.0,
-            "memory_used": random.uniform(400.0, 600.0) + (req.batch_size * 32.0),
-            "agent_logs": agent_logs,
-            "agent_findings": agent_findings
-        }
+        "type": "inference",
+        "model_name": req.model,
+        "batch_size": req.batch_size,
+        "priority": "NORMAL",
+        "agent_logs": agent_logs,
+        "agent_findings": agent_findings,
+        "submitted_at": time.time(),
+        "status": "PENDING"
     }
+    jobs_store[job_id] = job
+    await scheduler.schedule_job(job)
     return {"job_id": job_id, "status": "Submitted"}
 
 @app.get("/api/jobs/{job_id}/status")
@@ -250,15 +330,21 @@ async def get_jobs_fleet():
 
 @app.get("/api/scheduler/stats")
 async def get_scheduler_stats():
-    total_completed = len(recent_jobs) + len(jobs_store)
+    stats = scheduler.get_stats()
+    queue_status = scheduler.get_queue_status()
+    
+    active_instances = []
+    for gpu in physical_gpus:
+        active_instances.extend(gpu.list_instances())
+        
     return {
-        "total_jobs": total_completed + 14,
-        "avg_wait_time": random.uniform(0.04, 0.08),
-        "avg_throughput": random.uniform(9.2, 13.5),
-        "utilization_balance": random.uniform(95.4, 98.9),
-        "queued_jobs": pending_jobs_count,
-        "running_jobs": active_jobs_count,
-        "completed_jobs": total_completed
+        "total_jobs": stats.get("total_jobs", 0),
+        "avg_wait_time": stats.get("avg_wait_time", 0.0),
+        "avg_throughput": stats.get("avg_throughput", 0.0),
+        "utilization_balance": 98.5 if len(active_instances) > 0 else 0.0,
+        "queued_jobs": queue_status.get("queued_jobs", 0),
+        "running_jobs": queue_status.get("running_jobs", 0),
+        "completed_jobs": queue_status.get("completed_jobs", 0)
     }
 
 # --- WEB MONITORING WEBSOCKET ---
@@ -273,15 +359,16 @@ async def websocket_metrics(websocket: WebSocket):
                 metrics.append(gpu.get_metrics())
                 instances.extend(gpu.list_instances())
             
+            queue_status = scheduler.get_queue_status()
             await websocket.send_json({
                 "physical_gpus": metrics,
                 "vgpu_instances": instances,
                 "timestamp": time.time(),
                 "recent_jobs": recent_jobs,
                 "scheduler": {
-                    "active_jobs": active_jobs_count,
-                    "pending_jobs": pending_jobs_count,
-                    "queue_length": active_jobs_count + pending_jobs_count
+                    "active_jobs": queue_status.get("running_jobs", 0),
+                    "pending_jobs": queue_status.get("queued_jobs", 0),
+                    "queue_length": queue_status.get("queued_jobs", 0) + queue_status.get("running_jobs", 0)
                 }
             })
             await asyncio.sleep(1.0)
@@ -582,6 +669,21 @@ async def ws_render(websocket: WebSocket, vgpu_id: str):
             draw = ImageDraw.Draw(img)
             
             if is_stress:
+                # Allowed channels scales dynamically with compute and vram allocated
+                allowed_channels = 8
+                if compute_pct < 40:
+                    allowed_channels = 2
+                elif compute_pct < 70:
+                    allowed_channels = 4
+                elif compute_pct < 90:
+                    allowed_channels = 6
+
+                # Memory capacity constraints
+                if vram_mb < 1500:
+                    allowed_channels = min(allowed_channels, 2)
+                elif vram_mb < 3000:
+                    allowed_channels = min(allowed_channels, 4)
+
                 # Draw 8 viewports arranged in a 4x2 grid
                 shape_types = ["cube", "pyramid", "octahedron", "cylinder", "cone", "star", "ring", "wave"]
                 for row in range(2):
@@ -600,10 +702,17 @@ async def ws_render(websocket: WebSocket, vgpu_id: str):
                         
                         # Draw viewport identifiers (similar to surveillance feeds)
                         draw.text((col * 180 + 8, row * 200 + 6), f"CORE-A0{idx+1}", fill="#475569")
-                        draw.text((col * 180 + 120, row * 200 + 6), "ONLINE", fill="#76B900")
                         
-                        # Draw dynamic 3D shapes inside sub-viewports
-                        draw_shape_in_viewport(draw, cx, cy, 38, shape_type, angle)
+                        if idx < allowed_channels:
+                            draw.text((col * 180 + 120, row * 200 + 6), "ONLINE", fill="#76B900")
+                            # Draw dynamic 3D shapes inside sub-viewports
+                            draw_shape_in_viewport(draw, cx, cy, 38, shape_type, angle)
+                        else:
+                            draw.text((col * 180 + 120, row * 200 + 6), "MUTED", fill="#f85149")
+                            # Draw a red warning cross inside the locked viewport
+                            draw.line([(col * 180 + 20, row * 200 + 45), ((col + 1) * 180 - 20, (row + 1) * 200 - 25)], fill="#3a1215", width=1)
+                            draw.line([((col + 1) * 180 - 20, row * 200 + 45), (col * 180 + 20, (row + 1) * 200 - 25)], fill="#3a1215", width=1)
+                            draw.text((col * 180 + 45, row * 200 + 95), "RESOURCE LIMIT", fill="#4f2023")
                 
                 # Dynamic compute lag factor
                 lag_factor = 1.0

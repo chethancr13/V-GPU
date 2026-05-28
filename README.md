@@ -1,4 +1,4 @@
-# PROJECT ZENITH v2.0
+# V-GPU v2.0
 **The Real-World Elastic V-GPU Cloud Array**
 
 A high-performance asynchronous AI orchestration platform that manages real Docker-containerized V-GPU nodes, executes ML jobs with Celery/Redis, and provides deep telemetry.
@@ -12,10 +12,10 @@ A high-performance asynchronous AI orchestration platform that manages real Dock
 ## Infrastructure
 
 ```text
-                        [ Zenith React Hub ] <--- WebSockets
+                        [ V-GPU React Hub ] <--- WebSockets
                                  |
                                  v
-                     [ Zenith FastAPI API ] (Port 8000)
+                     [ V-GPU FastAPI API ] (Port 8000)
                         /        |        \
                 [ Redis ]  [ Docker.sock ]  [ Data/Datasets ]
                    |             |                |
@@ -38,7 +38,7 @@ docker build -t vgpu-worker -f Dockerfile.vgpu .
 ```
 
 ### 2. Launch the SaaS Cluster
-This will start Redis, the Celery Worker, and the Zenith API.
+This will start Redis, the Celery Worker, and the V-GPU API.
 ```bash
 # REBUILD to apply newly added Docker Socket mounts
 docker-compose up -d --build
@@ -52,7 +52,7 @@ npm run dev
 ```
 
 Visit **`http://localhost:5173`**.
-Use Operator **admin** and Key **admin** to enter the Zenith Console.
+Use Operator **admin** and Key **admin** to enter the V-GPU Console.
 
 ---
 
