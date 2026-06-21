@@ -28,15 +28,18 @@ def start_dashboard():
         cwd=frontend_dir,
         env=os.environ.copy()
     )
-    
-    # Give Vite a second to start
-    time.sleep(2)
-    try:
-        webbrowser.open("http://localhost:5173")
-    except:
-        pass
-        
     return dashboard_process
+
+def start_electron():
+    print("🖥️ Launching V-GPU Desktop App (Electron)...")
+    frontend_dir = os.path.join(os.getcwd(), "frontend")
+    electron_process = subprocess.Popen(
+        "npm run electron",
+        shell=True,
+        cwd=frontend_dir,
+        env=os.environ.copy()
+    )
+    return electron_process
 
 def import_dataset(source_path, target_name):
     import shutil
@@ -146,8 +149,10 @@ def main():
                             return
                         print(f"✅ Provisioned vGPU: {vgpu_id}")
                     
-                    # Auto-start dashboard
+                    # Auto-start dashboard and electron
                     start_dashboard()
+                    time.sleep(2)
+                    start_electron()
                 except Exception as e:
                     print(f"❌ Initialization error: {e}")
                     return
@@ -207,8 +212,10 @@ def main():
                 start_backend()
                 time.sleep(5)
 
-            # Start dashboard
+            # Start dashboard and electron
             start_dashboard()
+            time.sleep(2)
+            start_electron()
             
             import threading
             results_list = []
@@ -274,8 +281,10 @@ def main():
     time.sleep(3)  # Wait for backend to be ready
     
     dashboard = start_dashboard()
+    time.sleep(2)
+    electron = start_electron()
     
-    print("\n🌍 vGPU Environment is ready (Web Dashboard Mode)!")
+    print("\n🌍 vGPU Environment is ready (Electron Desktop App Mode)!")
     print("Backend:  http://localhost:8000")
     print("Frontend: http://localhost:5173")
     print("\nTo run an ML job, use: python3 vgpu_launcher.py run <script_name>\n")
@@ -287,6 +296,8 @@ def main():
         backend.terminate()
         if dashboard:
             dashboard.terminate()
+        if electron:
+            electron.terminate()
 
 if __name__ == "__main__":
     main()

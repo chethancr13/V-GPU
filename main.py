@@ -52,6 +52,18 @@ async def startup_event():
             
     asyncio.create_task(enforce_limits_loop())
 
+    # Pre-provision a default vGPU instance if none exists to ensure Docker connection is active
+    try:
+        all_instances = []
+        for gpu in physical_gpus:
+            all_instances.extend(gpu.list_instances())
+        if not all_instances:
+            print("🚀 [Monolith] Pre-provisioning default vGPU instance...")
+            physical_gpus[0].create_vgpu_instance(vram_limit=1024, compute_limit=50.0)
+            print("✅ [Monolith] Default vGPU instance pre-provisioned.")
+    except Exception as e:
+        print(f"⚠️ [Monolith] Failed to pre-provision default vGPU: {e}")
+
 # Global state for tracking ML jobs & scheduling
 recent_jobs = []
 active_jobs_count = 0

@@ -1,0 +1,13 @@
+@echo off
+echo Starting V-GPU Backend...
+start "" ".venv\Scripts\python.exe" -m uvicorn main:app --host 0.0.0.0 --port 8000
+
+echo Starting Vite Dev Server...
+start "" npm run dev --prefix frontend
+
+echo Waiting 5 seconds for servers to initialize...
+ping -n 6 127.0.0.1 >nul
+
+echo Launching V-GPU Desktop App...
+cd frontend
+npm run electron

@@ -29,7 +29,10 @@ class VGPUDevice:
         try:
             self.docker_client = docker.from_env()
             self.docker_available = True
-        except:
+            self._ensure_worker_image()
+            self._cleanup_stale_containers()
+        except Exception as e:
+            print(f"Docker connection failed: {e}. Simulation mode enabled.")
             self.docker_client = None
             self.docker_available = False
             
@@ -38,6 +41,48 @@ class VGPUDevice:
         self._monitor_running = True
         self._monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self._monitor_thread.start()
+
+    def _ensure_worker_image(self):
+        if not self.docker_available or not self.docker_client:
+            return
+        try:
+            self.docker_client.images.get("vgpu-worker")
+            print("🐳 [vGPU Driver] Docker image 'vgpu-worker' is already built.")
+        except docker.errors.ImageNotFound:
+            print("🐳 [vGPU Driver] Docker image 'vgpu-worker' not found. Building from vGPU-Worker.Dockerfile...")
+            import os
+            dockerfile = "vGPU-Worker.Dockerfile"
+            if os.path.exists(dockerfile):
+                try:
+                    self.docker_client.images.build(
+                        path=".",
+                        dockerfile=dockerfile,
+                        tag="vgpu-worker"
+                    )
+                    print("🐳 [vGPU Driver] Docker image 'vgpu-worker' built successfully.")
+                except Exception as build_err:
+                    print(f"⚠️ [vGPU Driver] Failed to build 'vgpu-worker' image: {build_err}")
+            else:
+                print(f"⚠️ [vGPU Driver] {dockerfile} not found. Cannot build worker image.")
+        except Exception as err:
+            print(f"⚠️ [vGPU Driver] Error checking for 'vgpu-worker' image: {err}")
+
+    def _cleanup_stale_containers(self):
+        if not self.docker_available or not self.docker_client:
+            return
+        try:
+            stale_containers = self.docker_client.containers.list(all=True, filters={"name": "vgpu-"})
+            if stale_containers:
+                print(f"🧹 [vGPU Driver] Found {len(stale_containers)} stale container(s) from previous runs. Cleaning up...")
+                for container in stale_containers:
+                    try:
+                        container.stop(timeout=1)
+                        container.remove()
+                        print(f"🧹 [vGPU Driver] Removed container: {container.name}")
+                    except Exception as ce:
+                        print(f"⚠️ [vGPU Driver] Failed to remove stale container {container.name}: {ce}")
+        except Exception as err:
+            print(f"⚠️ [vGPU Driver] Error cleaning up stale containers: {err}")
 
     def _monitor_loop(self):
         while self._monitor_running:
@@ -106,7 +151,7 @@ class VGPUDevice:
         if self.docker_available:
             try:
                 import os
-                cwd = os.getcwd()
+                cwd = os.getcwd().replace('\\', '/')
                 container = self.docker_client.containers.run(
                     "vgpu-worker",
                     command=["sleep", "infinity"],
