@@ -159,18 +159,22 @@ export default function Landing() {
 
                 const perspective = 800;
                 const scale = perspective / (perspective + rz + 800);
-                const x2d = cX + rx * scale;
-                const y2d = cY + ry * scale;
+                p.projX = cX + rx * scale;
+                p.projY = cY + ry * scale;
+                p.scale = scale;
 
                 // Only render if particle is in viewport
                 if (scale > 0) {
                     ctx.beginPath();
-                    ctx.arc(x2d, y2d, p.size * scale * 1.5, 0, Math.PI * 2);
+                    ctx.arc(p.projX, p.projY, p.size * scale * 1.5, 0, Math.PI * 2);
                     ctx.fillStyle = p.color;
-                    ctx.shadowBlur = 10 * scale;
-                    ctx.shadowColor = p.color;
                     ctx.fill();
-                    ctx.shadowBlur = 0; // reset shadow
+
+                    // Faster glow simulation: draw a secondary semi-transparent outer arc
+                    ctx.beginPath();
+                    ctx.arc(p.projX, p.projY, p.size * scale * 3.5, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color === 'var(--accent)' ? 'rgba(118, 185, 0, 0.15)' : 'rgba(88, 166, 255, 0.15)';
+                    ctx.fill();
                 }
             });
 
@@ -250,33 +254,19 @@ export default function Landing() {
                 });
             });
 
-            // Draw link lines between adjacent 3D particles to simulate network graph
+            // Draw link lines between adjacent 3D particles to simulate network graph (uses cached projections)
             ctx.strokeStyle = 'rgba(118, 185, 0, 0.04)';
             ctx.lineWidth = 0.5;
             for (let i = 0; i < particles.length; i += 8) {
                 for (let j = i + 1; j < i + 4; j++) {
                     if (j < particles.length) {
-                        // Project both points
                         let p1 = particles[i];
                         let p2 = particles[j];
 
-                        let rx1 = p1.x * cosY - p1.z * sinY;
-                        let rz1 = p1.x * sinY + p1.z * cosY;
-                        let ry1 = p1.y * cosX - rz1 * sinX;
-                        rz1 = p1.y * sinX + rz1 * cosX;
-
-                        let rx2 = p2.x * cosY - p2.z * sinY;
-                        let rz2 = p2.x * sinY + p2.z * cosY;
-                        let ry2 = p2.y * cosX - rz2 * sinX;
-                        rz2 = p2.y * sinX + rz2 * cosX;
-
-                        const scale1 = 800 / (800 + rz1 + 800);
-                        const scale2 = 800 / (800 + rz2 + 800);
-
-                        if (scale1 > 0 && scale2 > 0) {
+                        if (p1.scale > 0 && p2.scale > 0) {
                             ctx.beginPath();
-                            ctx.moveTo(cX + rx1 * scale1, cY + ry1 * scale1);
-                            ctx.lineTo(cX + rx2 * scale2, cY + ry2 * scale2);
+                            ctx.moveTo(p1.projX, p1.projY);
+                            ctx.lineTo(p2.projX, p2.projY);
                             ctx.stroke();
                         }
                     }
@@ -359,7 +349,7 @@ export default function Landing() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', width: '100%' }}>
 
                         {/* Matrix Card 1 */}
-                        <div style={{ background: 'rgba(22, 27, 34, 0.4)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '2.5rem', transition: 'all 0.3s ease', cursor: 'pointer' }}
+                        <div style={{ background: 'rgba(22, 27, 34, 0.9)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '2.5rem', transition: 'transform 0.3s ease, border-color 0.3s ease', cursor: 'pointer' }}
                             onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
                             onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'; }}>
                             <div style={{ width: '50px', height: '50px', background: 'rgba(118,185,0,0.1)', border: '1px solid rgba(118,185,0,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>
@@ -372,7 +362,7 @@ export default function Landing() {
                         </div>
 
                         {/* Matrix Card 2 */}
-                        <div style={{ background: 'rgba(22, 27, 34, 0.4)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '2.5rem', transition: 'all 0.3s ease', cursor: 'pointer' }}
+                        <div style={{ background: 'rgba(22, 27, 34, 0.9)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '2.5rem', transition: 'transform 0.3s ease, border-color 0.3s ease', cursor: 'pointer' }}
                             onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.borderColor = '#58a6ff'; }}
                             onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'; }}>
                             <div style={{ width: '50px', height: '50px', background: 'rgba(88,166,255,0.1)', border: '1px solid rgba(88,166,255,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>
@@ -385,7 +375,7 @@ export default function Landing() {
                         </div>
 
                         {/* Matrix Card 3 */}
-                        <div style={{ background: 'rgba(22, 27, 34, 0.4)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '2.5rem', transition: 'all 0.3s ease', cursor: 'pointer' }}
+                        <div style={{ background: 'rgba(22, 27, 34, 0.9)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '2.5rem', transition: 'transform 0.3s ease, border-color 0.3s ease', cursor: 'pointer' }}
                             onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
                             onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'; }}>
                             <div style={{ width: '50px', height: '50px', background: 'rgba(118,185,0,0.1)', border: '1px solid rgba(118,185,0,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>

@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import re
+import random
 from typing import Dict, Optional, Any, List
 from core.vgpu_driver import physical_gpus
 

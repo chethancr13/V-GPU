@@ -1,6 +1,7 @@
 import asyncio
 import time
 import random
+# pyrefly: ignore [missing-import]
 import numpy as np
 import moderngl
 import cv2

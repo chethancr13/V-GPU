@@ -6,7 +6,7 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "python3 ../scripts/start_dev.py",
     "beforeBuildCommand": "npm run build"
   },
   "app": {

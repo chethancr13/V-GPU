@@ -76,6 +76,22 @@ def main():
             import_dataset(source, target)
             return
 
+        if command == "tauri":
+            print("🖥️ Starting Tauri Desktop Client (dev mode)...")
+            frontend_dir = os.path.join(os.getcwd(), "frontend")
+            tauri_process = subprocess.Popen(
+                "npm run tauri dev",
+                shell=True,
+                cwd=frontend_dir,
+                env=os.environ.copy()
+            )
+            
+            try:
+                tauri_process.wait()
+            except KeyboardInterrupt:
+                pass
+            return
+
         if command == "clean":
             print("🧹 Cleaning up all vGPU instances and containers...")
             try:
@@ -278,6 +294,7 @@ def main():
     print("\n🌍 vGPU Environment is ready (Web Dashboard Mode)!")
     print("Backend:  http://localhost:8000")
     print("Frontend: http://localhost:5173")
+    print("\n💡 Hint: To run the Tauri Desktop GUI (with Docker Time Sync), run:\n   python3 vgpu_launcher.py tauri")
     print("\nTo run an ML job, use: python3 vgpu_launcher.py run <script_name>\n")
     
     try:

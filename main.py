@@ -52,6 +52,19 @@ async def startup_event():
             
     asyncio.create_task(enforce_limits_loop())
 
+    # Auto-provision default vGPUs if none exist (such as after running 'clean')
+    try:
+        total_instances = sum(len(gpu.list_instances()) for gpu in physical_gpus)
+        if total_instances == 0:
+            print("📦 [Startup] No active vGPU instances found. Auto-provisioning default fleet nodes...")
+            # Provision a vGPU node on simulated physical GPU 0
+            physical_gpus[0].create_vgpu_instance(vram_limit=4096, compute_limit=50.0)
+            # Provision a vGPU node on simulated physical GPU 1
+            physical_gpus[1].create_vgpu_instance(vram_limit=4096, compute_limit=50.0)
+            print("✅ [Startup] Default vGPU fleet nodes provisioned successfully.")
+    except Exception as e:
+        print(f"⚠️ [Startup] Warning: Failed to auto-provision default vGPU nodes: {e}")
+
 # Global state for tracking ML jobs & scheduling
 recent_jobs = []
 active_jobs_count = 0

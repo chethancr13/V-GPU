@@ -107,6 +107,9 @@ class VGPUDevice:
             try:
                 import os
                 cwd = os.getcwd()
+                # Pre-create directories locally to prevent Docker from creating them as root-owned
+                os.makedirs(f"{cwd}/data/results/{instance_id}", exist_ok=True)
+                os.makedirs(f"{cwd}/data/datasets", exist_ok=True)
                 container = self.docker_client.containers.run(
                     "vgpu-worker",
                     command=["sleep", "infinity"],
@@ -125,8 +128,6 @@ class VGPUDevice:
                     tty=True,
                     stdin_open=True
                 )
-                # Create the results directory locally
-                os.makedirs(f"{cwd}/data/results/{instance_id}", exist_ok=True)
                 container_id = container.id
             except Exception as e:
                 print(f"Warning: Failed to create VM container: {e}. Running in simulation mode.")
@@ -185,7 +186,33 @@ class VGPUDevice:
                     print(f"🔄 [vGPU Driver] Container {inst.container_id[:12]} is {container.status}. Restarting...")
                     container.start()
             except Exception as e:
-                print(f"⚠️ [vGPU Driver] Failed to verify/restart container: {e}")
+                print(f"⚠️ [vGPU Driver] Container not found or error: {e}. Re-creating container...")
+                try:
+                    import os
+                    cwd = os.getcwd()
+                    os.makedirs(f"{cwd}/data/results/{vgpu_id}", exist_ok=True)
+                    os.makedirs(f"{cwd}/data/datasets", exist_ok=True)
+                    container = self.docker_client.containers.run(
+                        "vgpu-worker",
+                        command=["sleep", "infinity"],
+                        detach=True,
+                        name=f"vgpu-{vgpu_id}",
+                        environment={
+                            "VGPU_ID": vgpu_id,
+                            "VRAM_LIMIT": str(inst.vram_limit),
+                            "COMPUTE_LIMIT": str(inst.compute_limit)
+                        },
+                        volumes={
+                            f"{cwd}/data/results/{vgpu_id}": {"bind": "/workspace/results", "mode": "rw"},
+                            f"{cwd}/data/datasets": {"bind": "/workspace/dataset", "mode": "ro"},
+                            f"{cwd}": {"bind": "/workspace/scripts", "mode": "ro"}
+                        },
+                        tty=True,
+                        stdin_open=True
+                    )
+                    inst.container_id = container.id
+                except Exception as re_err:
+                    print(f"❌ [vGPU Driver] Failed to recreate container: {re_err}")
                 
         return inst.container_id
 

@@ -1,0 +1,11 @@
+{
+  "name": "v-gpu-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "tauri": "npm --prefix frontend run tauri",
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "clean": "python3 vgpu_launcher.py clean"
+  }
+}
