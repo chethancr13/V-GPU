@@ -80,7 +80,7 @@ export default function Jobs() {
                         onChange={e => setSelectedVGPU(e.target.value)}
                         style={{ width: '100%', padding: '0.75rem', background: '#000', border: '1px solid var(--border)', color: 'white', outline: 'none', borderRadius: '4px' }}
                     >
-                        <option value="ALL_FLEET">🌐 PARALLEL FLEET (ALL NODES)</option>
+                        <option value="ALL_FLEET"> PARALLEL FLEET (ALL NODES)</option>
                         {/* Map active instances here */}
                     </select>
                 </div>

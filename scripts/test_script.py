@@ -7,16 +7,16 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str, help='Path to dataset')
 args = parser.parse_args()
 
-print("🚀 [V-GPU] Initializing NVIDIA-Zenith CUDA Runtime...")
+print(" [V-GPU] Initializing NVIDIA-Zenith CUDA Runtime...")
 time.sleep(1)
 
 if args.dataset:
-    print(f"📊 [Data] Loading dataset: {args.dataset}")
+    print(f" [Data] Loading dataset: {args.dataset}")
     time.sleep(1.5)
 else:
-    print("🧪 [Data] Using synthetic Gaussian distribution for training.")
+    print(" [Data] Using synthetic Gaussian distribution for training.")
 
-print("📉 [Model] Starting Stochastic Gradient Descent...")
+print(" [Model] Starting Stochastic Gradient Descent...")
 for i in range(5):
     time.sleep(0.5)
     loss = 0.5 / (i + 1) + random.uniform(0, 0.05)
@@ -33,4 +33,4 @@ print("=== End Leaderboard ===")
 print(f"\nAccuracy: {92.4 + random.uniform(0, 5)}%")
 print(f"Speed: {350 + random.randint(0, 150)} samples/sec")
 print(f"Loss: {0.045 + random.uniform(0, 0.01)}")
-print("✅ [V-GPU] Job completed successfully.")
+print(" [V-GPU] Job completed successfully.")

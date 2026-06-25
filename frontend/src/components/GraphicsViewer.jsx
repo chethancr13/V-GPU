@@ -72,7 +72,7 @@ function GraphicsViewer() {
             ctx.fillRect(0, 0, canvas.width, canvas.height)
             ctx.font = '14px monospace'
             ctx.fillStyle = 'var(--red)'
-            ctx.fillText('❌ ERROR: PIL (Pillow) library missing on host backend.', 40, 100)
+            ctx.fillText(' ERROR: PIL (Pillow) library missing on host backend.', 40, 100)
             ctx.fillStyle = 'var(--text-secondary)'
             ctx.fillText('Please run: pip install pillow', 40, 130)
           }

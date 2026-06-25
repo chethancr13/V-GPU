@@ -51,7 +51,7 @@ class VGPUTickerDashboard:
         self.update_loop()
 
     def on_closing(self):
-        print("🔌 Dashboard shutting down...")
+        print(" Dashboard shutting down...")
         self.running = False
         try:
             plt.close(self.fig)

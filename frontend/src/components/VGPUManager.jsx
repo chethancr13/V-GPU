@@ -194,7 +194,7 @@ function VGPUManager() {
             </button>
             {provisionMutation.isError && (
               <div style={{ color: 'var(--red)', fontSize: '0.75rem', marginTop: '0.75rem', textAlign: 'center', lineHeight: '1.4' }}>
-                ⚠️ {provisionMutation.error.message}
+                 {provisionMutation.error.message}
               </div>
             )}
           </div>

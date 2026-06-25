@@ -11,8 +11,8 @@ def run_parallel_task():
 
     ds_name = args.dataset.split('/')[-1] if args.dataset else "Unknown"
     
-    print(f"🚀 Cluster Node Initialized.")
-    print(f"📂 Processing partition: {ds_name}")
+    print(f" Cluster Node Initialized.")
+    print(f" Processing partition: {ds_name}")
     
     # Simulate parallel processing workload
     time.sleep(3)
@@ -21,7 +21,7 @@ def run_parallel_task():
     speed = random.uniform(300, 600)
     loss = random.uniform(0.05, 0.15)
     
-    print(f"📈 Node Metrics Summary:")
+    print(f" Node Metrics Summary:")
     print(f"Accuracy: {accuracy:.2f}%")
     print(f"Speed: {speed:.1f} samples/sec")
     print(f"Loss: {loss:.4f}")

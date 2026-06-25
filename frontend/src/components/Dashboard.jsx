@@ -23,7 +23,7 @@ function Dashboard() {
   const [isUploading, setIsUploading] = useState(false)
   const [isExecuting, setIsExecuting] = useState(false)
   const [terminalLogs, setTerminalLogs] = useState([
-    "🤖 System: Ready for compute instruction. Select target node, script, and dataset below."
+    " System: Ready for compute instruction. Select target node, script, and dataset below."
   ])
   const [activeLeaderboard, setActiveLeaderboard] = useState([])
 
@@ -91,7 +91,7 @@ function Dashboard() {
     if (!file) return
     
     setIsUploading(true)
-    setTerminalLogs(prev => [...prev, `📂 System: Ingesting dataset file [${file.name}]...`])
+    setTerminalLogs(prev => [...prev, ` System: Ingesting dataset file [${file.name}]...`])
     
     const formData = new FormData()
     formData.append('file', file)
@@ -103,16 +103,16 @@ function Dashboard() {
       })
       const result = await res.json()
       if (result.status === 'success') {
-        setTerminalLogs(prev => [...prev, `✅ System: Ingestion successful! Dataset [${file.name}] registered.`])
+        setTerminalLogs(prev => [...prev, ` System: Ingestion successful! Dataset [${file.name}] registered.`])
         // Refresh dataset lists
         const dRes = await fetch('http://localhost:8000/api/datasets').then(r => r.json())
         setDatasetList(dRes?.datasets || [])
         setSelectedDataset(file.name)
       } else {
-        setTerminalLogs(prev => [...prev, `❌ System: Upload failure: ${result.message}`])
+        setTerminalLogs(prev => [...prev, ` System: Upload failure: ${result.message}`])
       }
     } catch(err) {
-      setTerminalLogs(prev => [...prev, "❌ System: Network connection failed during dataset upload."])
+      setTerminalLogs(prev => [...prev, " System: Network connection failed during dataset upload."])
     } finally {
       setIsUploading(false)
     }
@@ -122,10 +122,10 @@ function Dashboard() {
   const handleInitializeCompute = async () => {
     setIsExecuting(true)
     setTerminalLogs([
-      "🚀 Dispatching compute pipeline container...",
-      `📍 Target Node: ${selectedVgpu === 'ALL_FLEET' ? 'Distributed Fleet Node Cluster' : `vGPU-${selectedVgpu.substring(0, 8)}`}`,
-      `📜 Execution Script: ${selectedScript}`,
-      `📂 Active Dataset: ${selectedDataset || 'Synthetic In-Memory Data Generator'}`,
+      " Dispatching compute pipeline container...",
+      ` Target Node: ${selectedVgpu === 'ALL_FLEET' ? 'Distributed Fleet Node Cluster' : `vGPU-${selectedVgpu.substring(0, 8)}`}`,
+      ` Execution Script: ${selectedScript}`,
+      ` Active Dataset: ${selectedDataset || 'Synthetic In-Memory Data Generator'}`,
       "⏳ Initializing virtual GPU thread allocations, training model in sandbox..."
     ])
 
@@ -158,13 +158,13 @@ function Dashboard() {
       clearInterval(spikeInterval)
       
       if (result && result.status !== 'error') {
-        const accuracyText = result.accuracy ? `🎯 Accuracy achieved: ${result.accuracy}%` : ''
-        const speedText = result.speed ? `⚡ Throughput: ${result.speed} samples/sec` : ''
+        const accuracyText = result.accuracy ? ` Accuracy achieved: ${result.accuracy}%` : ''
+        const speedText = result.speed ? ` Throughput: ${result.speed} samples/sec` : ''
         
         setTerminalLogs(prev => [
           ...prev,
           "--------------------------------------------",
-          "🏆 Pipeline execution completed successfully!",
+          " Pipeline execution completed successfully!",
           accuracyText,
           speedText,
           "--------------------------------------------",
@@ -204,13 +204,13 @@ function Dashboard() {
       } else {
         setTerminalLogs(prev => [
           ...prev,
-          "❌ Pipeline terminated with execution error:",
+          " Pipeline terminated with execution error:",
           result?.message || "Internal runner environment failure."
         ])
       }
     } catch (e) {
       clearInterval(spikeInterval)
-      setTerminalLogs(prev => [...prev, "❌ System: Server communication failure during execution."])
+      setTerminalLogs(prev => [...prev, " System: Server communication failure during execution."])
     } finally {
       setIsExecuting(false)
     }
@@ -313,7 +313,7 @@ function Dashboard() {
                   fontSize: '0.85rem'
                 }}
               >
-                <option value="ALL_FLEET">🌐 distributed fleet array (all nodes)</option>
+                <option value="ALL_FLEET"> distributed fleet array (all nodes)</option>
                 {vgpuList.map(v => (
                   <option key={v.id} value={v.id}>
                     vGPU-{v.id.substring(0,8)} ({v.vram_limit}MB, {v.compute_limit}% Compute)

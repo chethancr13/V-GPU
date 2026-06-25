@@ -21,6 +21,7 @@ class VGPUDevice:
         self.total_vram = total_vram  # MB
         self.total_compute = total_compute  # %
         self.instances: Dict[str, VGPUInstance] = {}
+        self.simulated_stress = False
         self._simulated_utilization = 0.0
         self._simulated_memory_used = 0.0
         self._simulated_temperature = 40.0
@@ -72,14 +73,57 @@ class VGPUDevice:
                     except:
                         pass
         
+        # Add simulated load based on running scheduler tasks and manual stress
+        scheduler_load = 0.0
+        scheduler_mem = 0.0
+        try:
+            from core.scheduler import scheduler
+            active_instances_with_jobs = 0
+            for inst_id in list(self.instances.keys()):
+                assigned_jobs = scheduler.vgpu_assignments.get(inst_id, [])
+                if assigned_jobs:
+                    active_instances_with_jobs += 1
+            
+            for inst_id in list(self.instances.keys()):
+                assigned_jobs = scheduler.vgpu_assignments.get(inst_id, [])
+                if assigned_jobs:
+                    # Each running job consumes compute and VRAM based on the vGPU configuration
+                    inst = self.instances[inst_id]
+                    if active_instances_with_jobs > 1:
+                        # Distributed workload: workload stress per VM is reduced
+                        scheduler_load += (inst.compute_limit / active_instances_with_jobs)
+                        scheduler_mem += (inst.vram_limit * 0.85 / active_instances_with_jobs)
+                    else:
+                        # Single VM workload: full stress load
+                        scheduler_load += inst.compute_limit
+                        scheduler_mem += inst.vram_limit * 0.85
+        except Exception:
+            pass
+
+        # Apply manual stress if toggled
+        if getattr(self, 'simulated_stress', False):
+            num_instances = len(self.instances)
+            if num_instances > 1:
+                # Partioning to multiple VMs divides manual stress impact
+                scheduler_load += 85.0 / num_instances
+                scheduler_mem += (self.total_vram * 0.70) / num_instances
+            else:
+                # Single VM: full stress load
+                scheduler_load += 85.0
+                scheduler_mem += self.total_vram * 0.70
+
         # Add some base "idle" noise
         idle_util = random.uniform(0.5, 2.0)
         idle_mem = random.uniform(300, 500)
         
-        self._simulated_utilization = max(total_cpu_pct, idle_util)
-        self._simulated_memory_used = max(total_mem_used, idle_mem)
-        self._simulated_temperature = 40 + (self._simulated_utilization * 0.4) + random.uniform(-0.5, 0.5)
-        self._simulated_power_draw = 50 + (self._simulated_utilization * 1.2) + random.uniform(-2, 2)
+        # Total metrics
+        calculated_util = min(100.0, total_cpu_pct + scheduler_load)
+        calculated_mem = min(self.total_vram, total_mem_used + scheduler_mem)
+
+        self._simulated_utilization = max(calculated_util, idle_util)
+        self._simulated_memory_used = max(calculated_mem, idle_mem)
+        self._simulated_temperature = min(98.0, 40 + (self._simulated_utilization * 0.45) + random.uniform(-0.5, 0.5))
+        self._simulated_power_draw = min(400.0, 50 + (self._simulated_utilization * 2.8) + random.uniform(-2, 2))
         self._last_update = time.time()
 
     def get_metrics(self) -> Dict:
@@ -183,10 +227,10 @@ class VGPUDevice:
             try:
                 container = self.docker_client.containers.get(inst.container_id)
                 if container.status != 'running':
-                    print(f"🔄 [vGPU Driver] Container {inst.container_id[:12]} is {container.status}. Restarting...")
+                    print(f" [vGPU Driver] Container {inst.container_id[:12]} is {container.status}. Restarting...")
                     container.start()
             except Exception as e:
-                print(f"⚠️ [vGPU Driver] Container not found or error: {e}. Re-creating container...")
+                print(f" [vGPU Driver] Container not found or error: {e}. Re-creating container...")
                 try:
                     import os
                     cwd = os.getcwd()
@@ -212,7 +256,7 @@ class VGPUDevice:
                     )
                     inst.container_id = container.id
                 except Exception as re_err:
-                    print(f"❌ [vGPU Driver] Failed to recreate container: {re_err}")
+                    print(f" [vGPU Driver] Failed to recreate container: {re_err}")
                 
         return inst.container_id
 

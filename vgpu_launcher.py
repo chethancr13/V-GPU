@@ -7,7 +7,7 @@ import requests
 import webbrowser
 
 def start_backend():
-    print("🚀 Starting V-GPU Backend (Monolithic)...")
+    print(" Starting V-GPU Backend (Monolithic)...")
     # Using uvicorn to serve the root FastAPI app
     backend_process = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"],
@@ -20,7 +20,7 @@ def start_backend():
 # start_frontend removed as per user request
 
 def start_dashboard():
-    print("🖥️ Starting vGPU Web Dashboard (React+Vite)...")
+    print(" Starting vGPU Web Dashboard (React+Vite)...")
     frontend_dir = os.path.join(os.getcwd(), "frontend")
     dashboard_process = subprocess.Popen(
         "npm run dev",
@@ -40,7 +40,7 @@ def start_dashboard():
 
 def import_dataset(source_path, target_name):
     import shutil
-    print(f"📥 Importing dataset: {source_path} -> {target_name}...")
+    print(f" Importing dataset: {source_path} -> {target_name}...")
     target_dir = os.path.join("data", "datasets", target_name)
     os.makedirs(target_dir, exist_ok=True)
     
@@ -57,10 +57,10 @@ def import_dataset(source_path, target_name):
             else:
                 shutil.copy2(s, d)
     else:
-        print(f"❌ Source path {source_path} does not exist.")
+        print(f" Source path {source_path} does not exist.")
         return False
     
-    print(f"✅ Dataset '{target_name}' imported successfully.")
+    print(f" Dataset '{target_name}' imported successfully.")
     return True
 
 def main():
@@ -77,7 +77,7 @@ def main():
             return
 
         if command == "tauri":
-            print("🖥️ Starting Tauri Desktop Client (dev mode)...")
+            print(" Starting Tauri Desktop Client (dev mode)...")
             frontend_dir = os.path.join(os.getcwd(), "frontend")
             tauri_process = subprocess.Popen(
                 "npm run tauri dev",
@@ -93,10 +93,10 @@ def main():
             return
 
         if command == "clean":
-            print("🧹 Cleaning up all vGPU instances and containers...")
+            print(" Cleaning up all vGPU instances and containers...")
             try:
                 # 1. Kill backend and frontend processes by port
-                print("🛑 Stopping backend and frontend...")
+                print(" Stopping backend and frontend...")
                 subprocess.run("lsof -ti:8000,5173 | xargs kill -9", shell=True, stderr=subprocess.DEVNULL)
                 
                 # 2. Cleanup Docker
@@ -110,9 +110,9 @@ def main():
                         c.remove()
                     except:
                         pass
-                print("✨ Environment fully cleaned and reset.")
+                print(" Environment fully cleaned and reset.")
             except Exception as e:
-                print(f"❌ Clean failed: {e}")
+                print(f" Clean failed: {e}")
             return
 
         if command == "run":
@@ -138,7 +138,7 @@ def main():
             try:
                 requests.get("http://localhost:8000/api/vgpu/list", timeout=2)
             except:
-                print("⚠️ Backend is not running. Starting it automatically...")
+                print(" Backend is not running. Starting it automatically...")
                 start_backend()
                 time.sleep(5)
 
@@ -150,25 +150,25 @@ def main():
                     if insts:
                         vgpu_id = insts[0]["id"]
                     else:
-                        print(f"❌ No active vGPU found. Provisioning one with {compute_limit}% compute...")
+                        print(f" No active vGPU found. Provisioning one with {compute_limit}% compute...")
                         resp = requests.post(f"http://localhost:8000/api/vgpu/provision?vram_mb=2048&compute_pct={compute_limit}")
                         if resp.status_code == 400:
-                            print(f"⚠️ Infrastructure Full: {resp.json().get('detail')}")
-                            print("💡 Hint: Run 'python3 vgpu_launcher.py clean' to reset the cluster.")
+                            print(f" Infrastructure Full: {resp.json().get('detail')}")
+                            print(" Hint: Run 'python3 vgpu_launcher.py clean' to reset the cluster.")
                             return
                         vgpu_id = resp.json().get("vgpu_id")
                         if not vgpu_id:
-                            print(f"❌ Failed to provision vGPU: {resp.text}")
+                            print(f" Failed to provision vGPU: {resp.text}")
                             return
-                        print(f"✅ Provisioned vGPU: {vgpu_id}")
+                        print(f" Provisioned vGPU: {vgpu_id}")
                     
                     # Auto-start dashboard
                     start_dashboard()
                 except Exception as e:
-                    print(f"❌ Initialization error: {e}")
+                    print(f" Initialization error: {e}")
                     return
 
-            print(f"🧪 Running ML Job on vGPU {vgpu_id}...")
+            print(f" Running ML Job on vGPU {vgpu_id}...")
             url = f"http://localhost:8000/api/jobs/ml?vgpu_id={vgpu_id}&script_name={script}"
             if dataset:
                 url += f"&dataset_name={dataset}"
@@ -176,12 +176,12 @@ def main():
             try:
                 resp = requests.post(url)
                 results = resp.json()
-                print("\n📈 --- Job Results ---")
+                print("\n --- Job Results ---")
                 
                 # Check for success vs failure
                 if results.get("status") == "failed" or results.get("accuracy") is None:
-                    print(f"❌ Job Status: {results.get('status', 'failed').upper()}")
-                    print("\n⚠️  [VGPU TERMINAL OUTPUT]")
+                    print(f" Job Status: {results.get('status', 'failed').upper()}")
+                    print("\n  [VGPU TERMINAL OUTPUT]")
                     print("-" * 30)
                     print(results.get("raw_output", "No output captured."))
                     print("-" * 30)
@@ -195,7 +195,7 @@ def main():
                     # Print Leaderboard
                     leaderboard = results.get("leaderboard")
                     if leaderboard:
-                        print("\n🏆 --- Model Leaderboard ---")
+                        print("\n --- Model Leaderboard ---")
                         print(f"{'Model Name':<20} | {'RMSE':<10} | {'MAE':<10} | {'R2':<10}")
                         print("-" * 60)
                         for m in leaderboard:
@@ -203,7 +203,7 @@ def main():
                 
                 print("----------------------\n")
             except Exception as e:
-                print(f"❌ Job execution failed: {e}")
+                print(f" Job execution failed: {e}")
             return
 
         if command == "run-parallel":
@@ -213,13 +213,13 @@ def main():
             script = sys.argv[2]
             datasets = sys.argv[3:]
             
-            print(f"🚀 Initializing Parallel Cluster for {len(datasets)} jobs...")
+            print(f" Initializing Parallel Cluster for {len(datasets)} jobs...")
             
             # Ensure Backend is running
             try:
                 requests.get("http://localhost:8000/api/vgpu/list")
             except:
-                print("⚠️ Backend is not running. Starting it automatically...")
+                print(" Backend is not running. Starting it automatically...")
                 start_backend()
                 time.sleep(5)
 
@@ -236,23 +236,23 @@ def main():
                     # Provision a fresh vGPU
                     prov_resp = requests.post("http://localhost:8000/api/vgpu/provision?vram_mb=1024&compute_pct=50")
                     if prov_resp.status_code == 400:
-                        print(f"⚠️ [Node {ds}] Resource Failure: Cluster is full. Run 'python3 vgpu_launcher.py clean'.")
+                        print(f" [Node {ds}] Resource Failure: Cluster is full. Run 'python3 vgpu_launcher.py clean'.")
                         return
                         
                     vid = prov_resp.json().get("vgpu_id")
                     if not vid:
-                        print(f"❌ [Node {ds}] Provisioning failed.")
+                        print(f" [Node {ds}] Provisioning failed.")
                         return
-                    print(f"✅ Created vGPU {vid} for {ds}")
+                    print(f" Created vGPU {vid} for {ds}")
                     
                     url = f"http://localhost:8000/api/jobs/ml?vgpu_id={vid}&script_name={script}&dataset_name={ds}"
                     job_resp = requests.post(url)
                     res = job_resp.json()
                     res["dataset"] = ds
                     results_list.append(res)
-                    print(f"🏁 Job finished for {ds}: Accuracy {res.get('accuracy')}%")
+                    print(f" Job finished for {ds}: Accuracy {res.get('accuracy')}%")
                 except Exception as e:
-                    print(f"❌ Parallel job failed for {ds}: {e}")
+                    print(f" Parallel job failed for {ds}: {e}")
 
             for ds in datasets:
                 t = threading.Thread(target=run_single, args=(ds,))
@@ -262,7 +262,7 @@ def main():
             for t in threads:
                 t.join()
                 
-            print("\n📊 --- Parallel Cluster Aggregated Results ---")
+            print("\n --- Parallel Cluster Aggregated Results ---")
             total_acc = 0
             total_speed = 0
             for res in results_list:
@@ -281,7 +281,7 @@ def main():
             
             if results_list:
                 avg_acc = total_acc / len(results_list)
-                print(f"\n✨ Cluster Metrics: Avg Accuracy: {avg_acc:.2f}% | Total Throughput: {total_speed:.2f} samples/sec")
+                print(f"\n Cluster Metrics: Avg Accuracy: {avg_acc:.2f}% | Total Throughput: {total_speed:.2f} samples/sec")
             print("------------------------------------------\n")
             return
 
@@ -291,16 +291,16 @@ def main():
     
     dashboard = start_dashboard()
     
-    print("\n🌍 vGPU Environment is ready (Web Dashboard Mode)!")
+    print("\n vGPU Environment is ready (Web Dashboard Mode)!")
     print("Backend:  http://localhost:8000")
     print("Frontend: http://localhost:5173")
-    print("\n💡 Hint: To run the Tauri Desktop GUI (with Docker Time Sync), run:\n   python3 vgpu_launcher.py tauri")
+    print("\n Hint: To run the Tauri Desktop GUI (with Docker Time Sync), run:\n   python3 vgpu_launcher.py tauri")
     print("\nTo run an ML job, use: python3 vgpu_launcher.py run <script_name>\n")
     
     try:
         backend.wait()
     except KeyboardInterrupt:
-        print("\n👋 Shutting down...")
+        print("\n Shutting down...")
         backend.terminate()
         if dashboard:
             dashboard.terminate()

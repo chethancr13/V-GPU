@@ -133,7 +133,7 @@ function SetupWizard() {
         {step === 1 && (
           <div className="space-y-4">
             <div className="bg-blue-900 p-4 rounded border border-blue-700">
-              <p className="font-semibold mb-2">📋 Step 1: Create Virtual Machine</p>
+              <p className="font-semibold mb-2"> Step 1: Create Virtual Machine</p>
               <p className="text-sm text-gray-300">First, let's create a new VM. Give it a meaningful name that describes its purpose.</p>
             </div>
 
@@ -152,9 +152,9 @@ function SetupWizard() {
             <div className="bg-gray-700 p-4 rounded">
               <p className="text-sm mb-2"><strong>What happens in background:</strong></p>
               <ul className="text-xs space-y-1 text-gray-300">
-                <li>✓ Ubuntu 20.04 container will be created</li>
-                <li>✓ VM will be isolated from host system</li>
-                <li>✓ VM gets unique ID and container ID</li>
+                <li> Ubuntu 20.04 container will be created</li>
+                <li> VM will be isolated from host system</li>
+                <li> VM gets unique ID and container ID</li>
               </ul>
             </div>
 
@@ -182,7 +182,7 @@ function SetupWizard() {
         {step === 2 && (
           <div className="space-y-4">
             <div className="bg-blue-900 p-4 rounded border border-blue-700">
-              <p className="font-semibold mb-2">🎮 Step 2: Assign vGPU to VM</p>
+              <p className="font-semibold mb-2"> Step 2: Assign vGPU to VM</p>
               <p className="text-sm text-gray-300">Your VM "{vmName}" has been created! Now let's assign GPU resources to it.</p>
             </div>
 
@@ -259,7 +259,7 @@ function SetupWizard() {
         {step === 3 && (
           <div className="space-y-4">
             <div className="bg-blue-900 p-4 rounded border border-blue-700">
-              <p className="font-semibold mb-2">⚙️ Step 3: Resource Configuration Summary</p>
+              <p className="font-semibold mb-2"> Step 3: Resource Configuration Summary</p>
               <p className="text-sm text-gray-300">Review the configuration before finalizing setup.</p>
             </div>
 
@@ -286,7 +286,7 @@ function SetupWizard() {
 
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Status:</span>
-                <span className="font-semibold text-green-400">✓ Ready</span>
+                <span className="font-semibold text-green-400"> Ready</span>
               </div>
             </div>
 
@@ -318,7 +318,7 @@ function SetupWizard() {
         {step === 4 && (
           <div className="space-y-4">
             <div className="bg-green-900 p-4 rounded border border-green-700">
-              <p className="font-semibold mb-2">✅ Step 4: Setup Complete!</p>
+              <p className="font-semibold mb-2"> Step 4: Setup Complete!</p>
               <p className="text-sm text-gray-300">Your VM is ready to use with allocated GPU resources.</p>
             </div>
 
@@ -379,7 +379,7 @@ function SetupWizard() {
                   <p className="font-semibold">vGPU {vgpu.id.slice(0, 8)}</p>
                   <p className="text-xs text-gray-400">VRAM: {vgpu.vram_limit}MB | Compute: {vgpu.compute_limit}%</p>
                 </div>
-                <span className="text-green-400">✓ Active</span>
+                <span className="text-green-400"> Active</span>
               </div>
             ))}
           </div>

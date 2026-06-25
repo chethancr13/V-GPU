@@ -32,7 +32,7 @@ class MLJobExecutor:
                 docker_client = temp_client
             except:
                 # --- ROBUST SIMULATION FALLBACK ---
-                print(f"📡 [Node {vgpu_id[:8]}] VM not found. Entering High-Fidelity Simulation Mode...")
+                print(f" [Node {vgpu_id[:8]}] VM not found. Entering High-Fidelity Simulation Mode...")
                 await asyncio.sleep(2)
                 acc = random.uniform(88, 99)
                 speed = random.uniform(200, 600)

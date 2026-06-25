@@ -1,32 +1,90 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
+/* ─── DARK MODE (Default) ──────────────────────────────────────────── */
 :root {
   --black: #050505;
   --dark-gray: #111111;
   --gray: #1a1a1a;
   --light-gray: #2a2a2a;
-  
+
   --accent: #76B900;
   --accent-glow: rgba(118, 185, 0, 0.4);
   --accent-dim: rgba(118, 185, 0, 0.1);
-  
+
   --text-primary: #FFFFFF;
   --text-secondary: #A3A3A3;
   --text-muted: #666666;
-  
+
   --red: #ef4444;
   --yellow: #f59e0b;
   --blue: #3b82f6;
 
   --border: rgba(255, 255, 255, 0.1);
   --glass: rgba(15, 15, 15, 0.6);
+
+  /* Theme-specific semantic tokens */
+  --surface-0: #050505;
+  --surface-1: #111111;
+  --surface-2: #1a1a1a;
+  --surface-3: #2a2a2a;
+  --input-bg: #1a1a1a;
+  --scrollbar-track: #050505;
+  --scrollbar-thumb: #2a2a2a;
+  --card-shadow: 0 2px 16px rgba(0,0,0,0.6);
+  --select-bg: #0b0b0b;
+  --select-option-bg: #111111;
+  --toggle-track-dark: #2a2a2a;
+  --sidebar-hover: rgba(255,255,255,0.02);
 }
 
-* {
+/* ─── LIGHT MODE ───────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --black: #f0f2f5;
+  --dark-gray: #ffffff;
+  --gray: #f5f7fa;
+  --light-gray: #e2e8f0;
+
+  --accent: #5a9100;
+  --accent-glow: rgba(90, 145, 0, 0.3);
+  --accent-dim: rgba(90, 145, 0, 0.08);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  --red: #dc2626;
+  --yellow: #d97706;
+  --blue: #2563eb;
+
+  --border: rgba(0, 0, 0, 0.09);
+  --glass: rgba(255, 255, 255, 0.7);
+
+  /* Theme-specific semantic tokens */
+  --surface-0: #f0f2f5;
+  --surface-1: #ffffff;
+  --surface-2: #f5f7fa;
+  --surface-3: #e2e8f0;
+  --input-bg: #ffffff;
+  --scrollbar-track: #e2e8f0;
+  --scrollbar-thumb: #cbd5e1;
+  --card-shadow: 0 2px 16px rgba(0,0,0,0.1);
+  --select-bg: #ffffff;
+  --select-option-bg: #f5f7fa;
+  --toggle-track-dark: #cbd5e1;
+  --sidebar-hover: rgba(0,0,0,0.03);
+}
+
+/* ─── THEME TRANSITION ─────────────────────────────────────────────── */
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
   font-family: 'Inter', system-ui, sans-serif;
+  transition:
+    background-color 0.22s ease,
+    color 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
 }
 
 body {
@@ -40,7 +98,7 @@ body {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* Page Layouts */
+/* ─── PAGE LAYOUTS ─────────────────────────────────────────────────── */
 .page-container {
   display: flex;
   min-height: 100vh;
@@ -62,7 +120,7 @@ body {
   padding: 2rem;
 }
 
-/* Transitions */
+/* ─── TRANSITIONS ──────────────────────────────────────────────────── */
 .fade-enter {
   opacity: 0;
   transform: translateY(10px);
@@ -73,7 +131,7 @@ body {
   transition: opacity 300ms, transform 300ms;
 }
 
-/* Skeletons */
+/* ─── SKELETONS ────────────────────────────────────────────────────── */
 .skeleton {
   background: linear-gradient(90deg, var(--gray) 25%, var(--light-gray) 50%, var(--gray) 75%);
   background-size: 200% 100%;
@@ -86,7 +144,7 @@ body {
   100% { background-position: -200% 0; }
 }
 
-/* Toast Animations */
+/* ─── TOASTS ───────────────────────────────────────────────────────── */
 .toast {
   position: fixed;
   bottom: 2rem;
@@ -95,7 +153,7 @@ body {
   border: 1px solid var(--border);
   padding: 1rem 1.5rem;
   border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  box-shadow: var(--card-shadow);
   animation: slideIn 0.3s ease-out forwards;
   z-index: 9999;
 }
@@ -105,12 +163,18 @@ body {
   to { transform: translateX(0); opacity: 1; }
 }
 
-/* Global Modern Flat Select Dropdown Styles */
+/* ─── SCROLLBAR ────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ─── SELECT DROPDOWN ──────────────────────────────────────────────── */
 select {
   appearance: none !important;
   -webkit-appearance: none !important;
   -moz-appearance: none !important;
-  background-color: #0b0b0b !important;
+  background-color: var(--select-bg) !important;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23A3A3A3' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
   background-repeat: no-repeat !important;
   background-position: right 0.75rem center !important;
@@ -130,8 +194,107 @@ select:focus {
 }
 
 select option {
-  background-color: #111111 !important;
-  color: #ffffff !important;
+  background-color: var(--select-option-bg) !important;
+  color: var(--text-primary) !important;
   padding: 0.5rem;
+}
+
+/* ─── LIGHT MODE OVERRIDES for inline-styled components ────────────── */
+/* These target common hard-coded dark colors used in inline styles */
+[data-theme="light"] input {
+  color: var(--text-primary) !important;
+  background-color: var(--input-bg) !important;
+}
+
+[data-theme="light"] input::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* ─── LIGHT MODE: Hard-coded dark surface overrides ─────────────────── */
+/*
+  Components use inline styles with hard-coded dark hex values.
+  We override the most common ones here via CSS background-color overrides.
+  These selectors target divs/sections using those specific colors.
+*/
+
+/* Surfaces that use #070b0e (deepest dark, e.g. ComputeComparison outer wrap) */
+[data-theme="light"] [style*="background: #070b0e"],
+[data-theme="light"] [style*="background: rgb(7, 11, 14)"],
+[data-theme="light"] [style*="background-color: #070b0e"] {
+  background-color: var(--surface-0) !important;
+  background: var(--surface-0) !important;
+}
+
+/* Surfaces using #0e141a (card backgrounds in ComputeComparison) */
+[data-theme="light"] [style*="background: #0e141a"],
+[data-theme="light"] [style*="background: rgb(14, 20, 26)"],
+[data-theme="light"] [style*="background-color: #0e141a"] {
+  background-color: var(--surface-1) !important;
+  background: var(--surface-1) !important;
+}
+
+/* Surfaces using #0b0b0b */
+[data-theme="light"] [style*="background: #0b0b0b"],
+[data-theme="light"] [style*="background: rgb(11, 11, 11)"],
+[data-theme="light"] [style*="background-color: #0b0b0b"] {
+  background-color: var(--surface-2) !important;
+  background: var(--surface-2) !important;
+}
+
+/* Surfaces using #050505 (deepest black) */
+[data-theme="light"] [style*="background: #050505"],
+[data-theme="light"] [style*="background: rgb(5, 5, 5)"],
+[data-theme="light"] [style*="background-color: #050505"] {
+  background-color: var(--surface-0) !important;
+  background: var(--surface-0) !important;
+}
+
+/* Surfaces using #111111 */
+[data-theme="light"] [style*="background: #111111"],
+[data-theme="light"] [style*="background: rgb(17, 17, 17)"],
+[data-theme="light"] [style*="background-color: #111111"] {
+  background-color: var(--surface-1) !important;
+  background: var(--surface-1) !important;
+}
+
+/* Surfaces using #111 shorthand */
+[data-theme="light"] [style*="background: #111;"],
+[data-theme="light"] [style*="background-color: #111"] {
+  background-color: var(--surface-1) !important;
+  background: var(--surface-1) !important;
+}
+
+/* Surfaces using #1a1a1a */
+[data-theme="light"] [style*="background: #1a1a1a"],
+[data-theme="light"] [style*="background: rgb(26, 26, 26)"],
+[data-theme="light"] [style*="background-color: #1a1a1a"] {
+  background-color: var(--surface-2) !important;
+  background: var(--surface-2) !important;
+}
+
+/* Surfaces using #0a0a0a */
+[data-theme="light"] [style*="background: #0a0a0a"],
+[data-theme="light"] [style*="background: rgb(10, 10, 10)"],
+[data-theme="light"] [style*="background-color: #0a0a0a"] {
+  background-color: var(--surface-0) !important;
+  background: var(--surface-0) !important;
+}
+
+/* Hard-coded white text (color: #fff / #ffffff / white) – reset to theme primary */
+[data-theme="light"] [style*="color: #fff;"],
+[data-theme="light"] [style*="color: #ffffff;"],
+[data-theme="light"] [style*="color: white;"],
+[data-theme="light"] [style*="color: rgb(255, 255, 255);"] {
+  color: var(--text-primary) !important;
+}
+
+/* Hard-coded dark terminal / code surfaces – keep them dark even in light mode for readability */
+[data-theme="light"] pre,
+[data-theme="light"] .terminal-log,
+[data-theme="light"] [style*="fontFamily: 'JetBrains Mono'"],
+[data-theme="light"] [style*="font-family: 'JetBrains Mono'"],
+[data-theme="light"] [style*="fontFamily: monospace"] {
+  background: #1a1d23 !important;
+  color: #e2e8f0 !important;
 }
 

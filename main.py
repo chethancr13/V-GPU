@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Uplo
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from core.vgpu_driver import physical_gpus
+from core.vgpu_driver import physical_gpus, VGPUDevice
 from core.scheduler import scheduler
 from core.isolation import isolation_manager
 from core.job_executor import MLJobExecutor
@@ -31,7 +31,9 @@ async def root():
 
 # --- DIRECTORIES ---
 DATASETS_DIR = "data/datasets"
+SCRIPTS_DIR = "data/scripts"
 os.makedirs(DATASETS_DIR, exist_ok=True)
+os.makedirs(SCRIPTS_DIR, exist_ok=True)
 
 # --- MODELS & STATE ---
 executor = MLJobExecutor()
@@ -52,18 +54,31 @@ async def startup_event():
             
     asyncio.create_task(enforce_limits_loop())
 
+    # Copy fallback ML files (overwriting python scripts to make sure they are updated, and keeping datasets)
+    try:
+        if os.path.exists("start_dev.py"):
+            shutil.copy("start_dev.py", os.path.join(SCRIPTS_DIR, "start_dev.py"))
+        if os.path.exists("my_ml_model.py"):
+            shutil.copy("my_ml_model.py", os.path.join(SCRIPTS_DIR, "my_ml_model.py"))
+        if os.path.exists("bench_utils.py"):
+            shutil.copy("bench_utils.py", os.path.join(SCRIPTS_DIR, "bench_utils.py"))
+        if os.path.exists("my_data.csv") and not os.path.exists(os.path.join(DATASETS_DIR, "my_data.csv")):
+            shutil.copy("my_data.csv", os.path.join(DATASETS_DIR, "my_data.csv"))
+    except Exception as e:
+        print(f" [Startup] Warning: Failed to copy fallback ML files: {e}")
+
     # Auto-provision default vGPUs if none exist (such as after running 'clean')
     try:
         total_instances = sum(len(gpu.list_instances()) for gpu in physical_gpus)
         if total_instances == 0:
-            print("📦 [Startup] No active vGPU instances found. Auto-provisioning default fleet nodes...")
+            print(" [Startup] No active vGPU instances found. Auto-provisioning default fleet nodes...")
             # Provision a vGPU node on simulated physical GPU 0
             physical_gpus[0].create_vgpu_instance(vram_limit=4096, compute_limit=50.0)
             # Provision a vGPU node on simulated physical GPU 1
             physical_gpus[1].create_vgpu_instance(vram_limit=4096, compute_limit=50.0)
-            print("✅ [Startup] Default vGPU fleet nodes provisioned successfully.")
+            print(" [Startup] Default vGPU fleet nodes provisioned successfully.")
     except Exception as e:
-        print(f"⚠️ [Startup] Warning: Failed to auto-provision default vGPU nodes: {e}")
+        print(f" [Startup] Warning: Failed to auto-provision default vGPU nodes: {e}")
 
 # Global state for tracking ML jobs & scheduling
 recent_jobs = []
@@ -77,6 +92,13 @@ async def upload_dataset(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
     return {"status": "success", "filename": file.filename}
 
+@app.post("/api/scripts/upload")
+async def upload_script(file: UploadFile = File(...)):
+    file_path = os.path.join(SCRIPTS_DIR, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return {"status": "success", "filename": file.filename}
+
 @app.get("/api/datasets")
 async def list_datasets():
     if not os.path.exists(DATASETS_DIR):
@@ -86,14 +108,10 @@ async def list_datasets():
 
 @app.get("/api/scripts")
 async def list_scripts():
-    scripts_dir = "scripts"
-    os.makedirs(scripts_dir, exist_ok=True)
-    system_scripts = ["my_ml_model.py", "test_script.py"]
-    user_scripts = []
-    if os.path.exists(scripts_dir):
-        user_scripts = [f for f in os.listdir(scripts_dir) if os.path.isfile(os.path.join(scripts_dir, f)) and f.endswith(".py")]
-    all_scripts = list(set(system_scripts + user_scripts))
-    return {"scripts": all_scripts}
+    if not os.path.exists(SCRIPTS_DIR):
+        return {"scripts": []}
+    files = [f for f in os.listdir(SCRIPTS_DIR) if os.path.isfile(os.path.join(SCRIPTS_DIR, f)) and f.endswith(".py")]
+    return {"scripts": files}
 
 @app.get("/api/vgpu/list")
 async def list_vgpu():
@@ -189,13 +207,32 @@ class JobRequest(BaseModel):
 async def run_ml_job(req: JobRequest):
     global active_jobs_count, pending_jobs_count
     
+    if req.script_code:
+        try:
+            with open("custom_run.py", "w") as f:
+                f.write(req.script_code)
+            req.script_name = "custom_run.py"
+        except Exception as e:
+            print(f"Error writing custom script: {e}")
+
+    # Resolve physical GPU ID if passed instead of vgpu instance UUID
+    resolved_vgpu_id = req.vgpu_id
+    try:
+        phys_id = int(req.vgpu_id)
+        if 0 <= phys_id < len(physical_gpus):
+            gpu_instances = physical_gpus[phys_id].list_instances()
+            if gpu_instances:
+                resolved_vgpu_id = gpu_instances[0]["id"]
+    except ValueError:
+        pass
+
     # Get all active vgpu instances
     instances = []
     for gpu in physical_gpus:
         instances.extend(gpu.list_instances())
         
     if req.vgpu_id == "ALL_FLEET" and len(instances) > 0:
-        print(f"🚀 [Monolith] Executing parallel jobs on all fleet nodes...")
+        print(f" [Monolith] Executing parallel jobs on all fleet nodes...")
         pending_jobs_count += len(instances)
         
         async def run_one(inst_id):
@@ -225,11 +262,11 @@ async def run_ml_job(req: JobRequest):
         return {"status": "completed"}
     else:
         pending_jobs_count += 1
-        print(f"🚀 [Monolith] Executing job on {req.vgpu_id}...")
+        print(f" [Monolith] Executing job on resolved vgpu {resolved_vgpu_id}...")
         try:
             pending_jobs_count = max(0, pending_jobs_count - 1)
             active_jobs_count += 1
-            result = await executor.run_ml_job(req.vgpu_id, req.script_name, req.dataset_name)
+            result = await executor.run_ml_job(resolved_vgpu_id, req.script_name, req.dataset_name)
             if result:
                 result["run_mode"] = "SINGLE"
                 result["run_group"] = str(uuid.uuid4())
@@ -239,6 +276,46 @@ async def run_ml_job(req: JobRequest):
             return result
         finally:
             active_jobs_count = max(0, active_jobs_count - 1)
+
+# --- BENCHMARK ENDPOINTS ---
+class BenchmarkRunRequest(BaseModel):
+    script_name: str
+    dataset_name: str
+    vgpu_code: Optional[str] = None
+    jupyter_code: Optional[str] = None
+    colab_code: Optional[str] = None
+
+@app.post("/api/benchmark/run")
+async def run_benchmark(req: BenchmarkRunRequest):
+    from core.benchmark_runner import benchmark_runner
+    started = benchmark_runner.run_benchmark(
+        script_name=req.script_name,
+        dataset_name=req.dataset_name,
+        vgpu_code=req.vgpu_code,
+        jupyter_code=req.jupyter_code,
+        colab_code=req.colab_code
+    )
+    if not started:
+        raise HTTPException(status_code=400, detail="Benchmark is already running")
+    return {"status": "started"}
+
+@app.get("/api/benchmark/status")
+async def get_benchmark_status():
+    from core.benchmark_runner import benchmark_runner
+    with benchmark_runner._lock:
+        return {
+            "status": benchmark_runner.status,
+            "progress": benchmark_runner.progress,
+            "logs": benchmark_runner.logs,
+            "metrics": benchmark_runner.metrics,
+            "error_message": benchmark_runner.error_message
+        }
+
+@app.post("/api/benchmark/reset")
+async def reset_benchmark():
+    from core.benchmark_runner import benchmark_runner
+    benchmark_runner.reset()
+    return {"status": "reset"}
 
 # --- COMPUTE & INFERENCE SIMULATED RUNNERS ---
 jobs_store = {}
@@ -274,7 +351,7 @@ async def run_inference_job(req: InferenceRequest):
     job_id = str(uuid.uuid4())
     
     agent_logs = [
-        "🤖 AI Agent status: [ACTIVE] Ingesting neural context...",
+        " AI Agent status: [ACTIVE] Ingesting neural context...",
     ]
     agent_findings = "No dataset was targeted for analysis."
     
@@ -303,12 +380,12 @@ async def run_inference_job(req: InferenceRequest):
                     agent_findings = f"AI Agent Analysis Complete! Target feature set: '{target}' (mean: {mean_val:.2f}). Covariance calculations resolved successfully. Model classification threshold set at 98.42% accuracy bounds."
                 else:
                     agent_findings = "AI Agent Analysis Complete! Discovered symbolic datasets without numeric distribution vectors. Calculated cluster grouping parameters using dynamic clustering models."
-                agent_logs.append("🤖 Pipeline complete! Broadcasting model coefficients to leaderboard.")
+                agent_logs.append(" Pipeline complete! Broadcasting model coefficients to leaderboard.")
             except Exception as e:
-                agent_logs.append(f"❌ Error during dataset load: {str(e)}")
+                agent_logs.append(f" Error during dataset load: {str(e)}")
                 agent_findings = f"AI Agent encountered an error during parsing: {str(e)}"
         else:
-            agent_logs.append(f"⚠️ Dataset path not found: {file_path}")
+            agent_logs.append(f" Dataset path not found: {file_path}")
             agent_findings = "Target dataset reference could not be localized on current cluster block storage."
             
     job = {
@@ -333,6 +410,45 @@ async def get_job_status(job_id: str):
     return jobs_store[job_id]
 
 # --- BACKWARD-COMPATIBLE REST ENDPOINTS ---
+class StressRequest(BaseModel):
+    stress: bool
+
+@app.post("/api/gpu/{gpu_id}/stress")
+async def toggle_gpu_stress(gpu_id: int, req: StressRequest):
+    if gpu_id < 0 or gpu_id >= len(physical_gpus):
+        raise HTTPException(status_code=404, detail="Physical GPU not found")
+    physical_gpus[gpu_id].simulated_stress = req.stress
+    return {"status": "success", "gpu_id": gpu_id, "stress": req.stress}
+
+class PhysicalGPURequest(BaseModel):
+    name: str
+    vram_mb: int = 32768
+    compute_limit: float = 100.0
+
+@app.post("/api/gpu/register")
+async def register_physical_gpu(req: PhysicalGPURequest):
+    new_gpu_id = len(physical_gpus)
+    new_gpu = VGPUDevice(
+        physical_gpu_id=new_gpu_id,
+        total_vram=req.vram_mb,
+        total_compute=req.compute_limit
+    )
+    # Add to global list
+    physical_gpus.append(new_gpu)
+    
+    # Automatically provision a default vGPU instance on it so it is immediately ready to run container workloads!
+    default_vgpu_id = new_gpu.create_vgpu_instance(
+        vram_limit=req.vram_mb // 2,  # Allocate half the total VRAM to a default instance
+        compute_limit=50.0            # Allocate 50% compute limit
+    )
+    
+    print(f" Registered custom physical GPU Host: {req.name} with ID {new_gpu_id} and default vGPU {default_vgpu_id}")
+    return {
+        "gpu_id": new_gpu_id,
+        "vgpu_id": default_vgpu_id,
+        "status": "registered"
+    }
+
 @app.get("/api/gpu/physical")
 async def get_gpu_physical():
     return [gpu.get_metrics() for gpu in physical_gpus]
@@ -381,7 +497,8 @@ async def websocket_metrics(websocket: WebSocket):
                 "scheduler": {
                     "active_jobs": queue_status.get("running_jobs", 0),
                     "pending_jobs": queue_status.get("queued_jobs", 0),
-                    "queue_length": queue_status.get("queued_jobs", 0) + queue_status.get("running_jobs", 0)
+                    "queue_length": queue_status.get("queued_jobs", 0) + queue_status.get("running_jobs", 0),
+                    "running_jobs": list(scheduler.running_jobs.values())
                 }
             })
             await asyncio.sleep(1.0)
