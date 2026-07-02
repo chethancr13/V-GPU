@@ -83,7 +83,7 @@ def get_batches(d): return []
 _real_open = open
 def _themed_open(file, *a, **kw):
     if isinstance(file, str) and file.endswith('.csv'):
-        print("🌐 [Colab Network] Downloading dataset from remote CDN..."); _time.sleep(5.0)
+        print(" [Colab Network] Downloading dataset from remote CDN..."); _time.sleep(5.0)
     return _real_open(file, *a, **kw)
 builtins.open = _themed_open
 try:
@@ -91,7 +91,7 @@ try:
     _ro_csv = _pd.read_csv
     def _themed_csv(fp, *a, **kw):
         if isinstance(fp, str) and fp.endswith('.csv'):
-            print("🌐 [Colab Network] Downloading dataset from remote CDN..."); _time.sleep(5.0)
+            print(" [Colab Network] Downloading dataset from remote CDN..."); _time.sleep(5.0)
         return _ro_csv(fp, *a, **kw)
     _pd.read_csv = _themed_csv
 except ImportError:
@@ -140,7 +140,7 @@ class SimpleMLP:
 
     def train(self, dataset, epochs=20):
         X,y = dataset
-        print("📈 [Colab Instance] Starting shared Tesla T4 cloud training...")
+        print(" [Colab Instance] Starting shared Tesla T4 cloud training...")
         for epoch in range(1, epochs+1):
             loss,acc = self.train_step(X, y)
             _time.sleep(0.08)

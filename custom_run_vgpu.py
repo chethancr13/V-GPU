@@ -83,7 +83,7 @@ def get_batches(d): return []
 _real_open = open
 def _themed_open(file, *a, **kw):
     if isinstance(file, str) and file.endswith('.csv'):
-        print("📂 [V-GPU Cache] Accessing dataset via InfiniBand NFS workspace..."); _time.sleep(0.01)
+        print(" [V-GPU Cache] Accessing dataset via InfiniBand NFS workspace..."); _time.sleep(0.01)
     return _real_open(file, *a, **kw)
 builtins.open = _themed_open
 try:
@@ -91,7 +91,7 @@ try:
     _ro_csv = _pd.read_csv
     def _themed_csv(fp, *a, **kw):
         if isinstance(fp, str) and fp.endswith('.csv'):
-            print("📂 [V-GPU Cache] Accessing dataset via InfiniBand NFS workspace..."); _time.sleep(0.01)
+            print(" [V-GPU Cache] Accessing dataset via InfiniBand NFS workspace..."); _time.sleep(0.01)
         return _ro_csv(fp, *a, **kw)
     _pd.read_csv = _themed_csv
 except ImportError:
@@ -140,7 +140,7 @@ class SimpleMLP:
 
     def train(self, dataset, epochs=80):
         X,y = dataset
-        print("📈 [V-GPU Cluster] ZeRO-3 distributed training on 12-node H100 cluster...")
+        print(" [V-GPU Cluster] ZeRO-3 distributed training on 12-node H100 cluster...")
         for epoch in range(1, epochs+1):
             loss,acc = self.train_step(X, y)
             _time.sleep(0.001)
