@@ -9,6 +9,7 @@ import VMInspector from './components/VMInspector'
 import GraphicsViewer from './components/GraphicsViewer'
 import ComputeComparison from './components/ComputeComparison'
 import Logs from './components/Logs'
+import AIComparisonAgent from './components/AIComparisonAgent'
 import {
   LayoutDashboard, Server, Box, GitCompare,
   Image as ImageIcon, FileText, Settings,
@@ -280,6 +281,7 @@ function App() {
           <main style={{ flex: 1, overflowY: 'auto', background: 'var(--black)' }}>
             {ActiveComponent && <ActiveComponent />}
           </main>
+          <AIComparisonAgent activeTab={activeTab} setActiveTab={setActiveTab} />
         </div>
       </div>
     </QueryClientProvider>
