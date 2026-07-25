@@ -58,7 +58,7 @@ export default function AIComparisonAgent({ activeTab, setActiveTab }) {
     }))
 
     try {
-      const response = await fetch('http://localhost:8000/api/agent/chat', {
+      const response = await fetch('http://localhost:8000/api/chatbot/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -66,8 +66,8 @@ export default function AIComparisonAgent({ activeTab, setActiveTab }) {
         },
         body: JSON.stringify({
           message: text,
-          active_tab: activeTab,
-          history: historyPayload
+          session_id: 'copilot_drawer',
+          api_key: apiKey
         })
       })
 
@@ -79,8 +79,9 @@ export default function AIComparisonAgent({ activeTab, setActiveTab }) {
       
       const agentMessage = {
         id: (Date.now() + 1).toString(),
-        text: data.text || 'No response received from agent.',
+        text: data.answer || 'No response received from agent.',
         sender: 'agent',
+        citations: data.citations || [],
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
 

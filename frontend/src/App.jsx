@@ -11,11 +11,12 @@ import GraphicsViewer from './components/GraphicsViewer'
 import ComputeComparison from './components/ComputeComparison'
 import Logs from './components/Logs'
 import AIComparisonAgent from './components/AIComparisonAgent'
+import ProjectAIChatbot from './components/ProjectAIChatbot'
 import {
   LayoutDashboard, Server, Box, GitCompare,
   Image as ImageIcon, FileText, Settings,
   HelpCircle, Bell, Search, Cpu as CpuIcon, Activity, Network, Droplet,
-  Sun, Moon, Monitor
+  Sun, Moon, Monitor, Bot
 } from 'lucide-react'
 
 const queryClient = new QueryClient()
@@ -44,6 +45,7 @@ function App() {
   //  Navigation Tabs 
   const tabs = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, component: Dashboard },
+    { id: 'project_chatbot', name: 'Project AI Assistant', icon: Bot, component: ProjectAIChatbot },
     { id: 'gpu_monitor', name: 'GPU Monitor', icon: Activity, component: GPUMonitor },
     { id: 'ai_data_center', name: 'AI Data Center', icon: Network, component: AIDataCenter },
     { id: 'control_center', name: 'Control Center', icon: Monitor, component: ControlCenter },

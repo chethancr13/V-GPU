@@ -154,7 +154,7 @@ from openvgpu import VGPUClusterConfig
 cluster_config = VGPUClusterConfig(devices=["vgpu-0", "vgpu-1"], sharding="zero-3")
 model, optimizer, _, _ = deepspeed.initialize(
     args=None,
-    model=load_custom_model_structure("my_ml_model.py"),
+    model=load_custom_model_structure("bench_utils.py"),
     model_parameters=get_params(),
     config=cluster_config.deepspeed_json()
 )

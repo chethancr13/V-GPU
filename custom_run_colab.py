@@ -151,7 +151,7 @@ import torch
 
 # Load on standard cloud instance (Tesla T4)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = load_remote_model("my_ml_model.py").to(device)
+model = load_remote_model("bench_utils.py").to(device)
 
 # Remote network dataset pull
 import pandas as pd

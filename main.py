@@ -13,6 +13,9 @@ from core.vgpu_driver import physical_gpus, VGPUDevice
 from core.scheduler import scheduler
 from core.isolation import isolation_manager
 from core.job_executor import MLJobExecutor
+from core.chatbot.rag_engine import ProjectRAGEngine
+from core.chatbot.indexer import ProjectIndexer
+from core.chatbot.memory import ChatMemory
 
 app = FastAPI(title="V-GPU NVIDIA Control Plane (Monolith)")
 
@@ -37,6 +40,9 @@ os.makedirs(SCRIPTS_DIR, exist_ok=True)
 
 # --- MODELS & STATE ---
 executor = MLJobExecutor()
+rag_engine = ProjectRAGEngine()
+project_indexer = ProjectIndexer()
+chat_memory = ChatMemory()
 
 @app.on_event("startup")
 async def startup_event():
@@ -53,6 +59,17 @@ async def startup_event():
             await asyncio.sleep(1.0)
             
     asyncio.create_task(enforce_limits_loop())
+
+    # Start initial project scanning & indexing in background
+    async def initial_index_task():
+        try:
+            print(" [Startup] Scanning and indexing project files for RAG Assistant...")
+            stats = project_indexer.scan_and_index()
+            print(f" [Startup] Project indexing complete. Total files: {stats['total_files']}, chunks: {stats['total_chunks']}")
+        except Exception as e:
+            print(f" [Startup] Warning: Indexing failed: {e}")
+            
+    asyncio.create_task(initial_index_task())
 
     # Copy fallback ML files (overwriting python scripts to make sure they are updated, and keeping datasets)
     try:
@@ -416,6 +433,43 @@ async def agent_chat(req: ChatRequest, request: Request):
     api_key = user_key or os.environ.get("GEMINI_API_KEY")
     res = await handle_agent_chat(req.message, req.active_tab, req.history, api_key)
     return res
+
+# --- PROJECT RAG CHATBOT ENDPOINTS ---
+class RAGQueryRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = "default_session"
+    api_key: Optional[str] = None
+    hf_token: Optional[str] = None
+
+@app.post("/api/chatbot/query")
+async def rag_chatbot_query(req: RAGQueryRequest, request: Request):
+    user_key = request.headers.get("x-gemini-key")
+    api_key = req.api_key or user_key or os.environ.get("GEMINI_API_KEY")
+    hf_token = req.hf_token or request.headers.get("x-hf-token") or os.environ.get("HF_TOKEN")
+    result = rag_engine.query(req.message, session_id=req.session_id, api_key=api_key, hf_token=hf_token)
+    return result
+
+@app.post("/api/chatbot/index/resync")
+async def rag_index_resync(request: Request):
+    user_key = request.headers.get("x-gemini-key")
+    api_key = user_key or os.environ.get("GEMINI_API_KEY")
+    stats = project_indexer.scan_and_index(force_reindex=True, api_key=api_key)
+    return stats
+
+@app.get("/api/chatbot/index/status")
+async def rag_index_status():
+    stats = project_indexer.vector_store.get_index_stats()
+    return stats
+
+@app.get("/api/chatbot/history/{session_id}")
+async def rag_get_history(session_id: str):
+    history = chat_memory.get_history(session_id)
+    return {"session_id": session_id, "history": history}
+
+@app.delete("/api/chatbot/history/{session_id}")
+async def rag_clear_history(session_id: str):
+    chat_memory.clear_history(session_id)
+    return {"status": "success", "session_id": session_id}
 
 class JobRequest(BaseModel):
     vgpu_id: str
