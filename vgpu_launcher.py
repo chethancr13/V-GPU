@@ -6,11 +6,22 @@ import os
 import requests
 import webbrowser
 
+def get_python_executable():
+    dirs_to_check = [os.getcwd(), os.path.dirname(os.path.abspath(__file__))]
+    for base_dir in dirs_to_check:
+        for venv_dir in [".venv", "venv"]:
+            for bin_dir, exe in [("bin", "python"), ("bin", "python3"), ("Scripts", "python.exe")]:
+                candidate = os.path.join(base_dir, venv_dir, bin_dir, exe)
+                if os.path.exists(candidate):
+                    return candidate
+    return sys.executable
+
 def start_backend():
     print(" Starting V-GPU Backend (Monolithic)...")
     # Using uvicorn to serve the root FastAPI app
+    python_exe = get_python_executable()
     backend_process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"],
+        [python_exe, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"],
         env={**os.environ, "PYTHONPATH": os.getcwd()}
     )
     return backend_process

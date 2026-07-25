@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Dashboard from './components/Dashboard'
 import GPUMonitor from './components/GPUMonitor'
 import AIDataCenter from './components/AIDataCenter'
+import ControlCenter from './components/ControlCenter'
 import WaterComputePlanner from './components/WaterComputePlanner'
 import VGPUManager from './components/VGPUManager'
 import VMInspector from './components/VMInspector'
@@ -14,7 +15,7 @@ import {
   LayoutDashboard, Server, Box, GitCompare,
   Image as ImageIcon, FileText, Settings,
   HelpCircle, Bell, Search, Cpu as CpuIcon, Activity, Network, Droplet,
-  Sun, Moon
+  Sun, Moon, Monitor
 } from 'lucide-react'
 
 const queryClient = new QueryClient()
@@ -45,6 +46,7 @@ function App() {
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, component: Dashboard },
     { id: 'gpu_monitor', name: 'GPU Monitor', icon: Activity, component: GPUMonitor },
     { id: 'ai_data_center', name: 'AI Data Center', icon: Network, component: AIDataCenter },
+    { id: 'control_center', name: 'Control Center', icon: Monitor, component: ControlCenter },
     { id: 'water_resource', name: 'Water & Resource', icon: Droplet, component: WaterComputePlanner },
     { id: 'comparison', name: 'Speed Comparison', icon: GitCompare, component: ComputeComparison },
     { id: 'vgpu', name: 'vGPU Manager', icon: Server, component: VGPUManager },

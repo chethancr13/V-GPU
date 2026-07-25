@@ -154,13 +154,13 @@ from openvgpu import VGPUClusterConfig
 cluster_config = VGPUClusterConfig(devices=["vgpu-0", "vgpu-1"], sharding="zero-3")
 model, optimizer, _, _ = deepspeed.initialize(
     args=None,
-    model=load_custom_model_structure("bench_utils.py"),
+    model=load_custom_model_structure("my_ml_model.py"),
     model_parameters=get_params(),
     config=cluster_config.deepspeed_json()
 )
 
 # Rapid parallel dataset mount (V-GPU caching)
-dataset = load_dataset_from_mounted_path("/workspace/dataset/my_data.csv")
+dataset = load_dataset_from_mounted_path("/workspace/dataset/messy_sales - Sheet1.csv")
 # Run real multi-GPU sharded training
 model.train(dataset, epochs=30)
 print("V-GPU CUDA Parallel job finished successfully!")

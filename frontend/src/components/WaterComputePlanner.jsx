@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Droplet, Cpu, Activity, Zap, Info, Server, Network, Sliders, RefreshCw, BarChart2, ShieldAlert, Layers } from 'lucide-react'
+import { Droplet, Cpu, Activity, Zap, Info, Server, Network, Sliders, RefreshCw, BarChart2, ShieldAlert, Layers, Battery, Fuel, Power, Thermometer, Gauge } from 'lucide-react'
 
 function WaterComputePlanner() {
   const [data, setData] = useState(null)
@@ -20,6 +20,30 @@ function WaterComputePlanner() {
   // Cooling efficiency options (influences WUE)
   const [wueOptimized, setWueOptimized] = useState(true)
   const [displayLayer, setDisplayLayer] = useState('COMBINED') // 'COMBINED', 'SERVERS', 'PIPELINES'
+
+  // Power & Backup system states
+  const [genActive, setGenActive] = useState(false)
+  const [batteryCharging, setBatteryCharging] = useState(true)
+  const [powerTel, setPowerTel] = useState({
+    upsLoad: 45, upsBattery: 87,
+    genFuel: 92, genOutput: 0,
+    batteryCharge: 78, batteryTemp: 32,
+  })
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPowerTel(prev => ({
+        ...prev,
+        upsLoad: Math.max(20, Math.min(95, prev.upsLoad + (Math.random() - 0.5) * 4)),
+        upsBattery: Math.max(10, Math.min(100, prev.upsBattery + (Math.random() - 0.5) * 0.5)),
+        genOutput: genActive ? 350 + Math.random() * 20 : 0,
+        genFuel: genActive ? Math.max(5, prev.genFuel - 0.05) : prev.genFuel,
+        batteryCharge: batteryCharging ? Math.min(100, prev.batteryCharge + 0.1) : Math.max(20, prev.batteryCharge - 0.15),
+        batteryTemp: prev.batteryTemp + (Math.random() - 0.5) * 0.3,
+      }))
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [genActive, batteryCharging])
 
   // Helper opacities for different layer highlights
   const getPipelineOpacity = () => {
@@ -532,6 +556,68 @@ function WaterComputePlanner() {
             </div>
           </div>
 
+        </div>
+
+      </div>
+
+      {/* Power & Backup Systems Monitoring */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+        
+        <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderLeft: '4px solid #f97316', borderRadius: '4px', padding: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8b949e' }}>UPS SYSTEM</span>
+            <Power size={14} color="#f97316" />
+          </div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff' }}>{powerTel.upsLoad.toFixed(0)}%</div>
+          <div style={{ fontSize: '0.6rem', color: '#8b949e', marginTop: '0.25rem' }}>
+            Load: {powerTel.upsLoad.toFixed(0)}% | Battery: {powerTel.upsBattery.toFixed(0)}% | 500 kVA
+          </div>
+          <div style={{ height: '4px', background: '#0a0f14', borderRadius: '2px', marginTop: '0.5rem', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${powerTel.upsLoad}%`, background: powerTel.upsLoad > 80 ? '#ef4444' : '#f97316', borderRadius: '2px', transition: 'width 0.5s' }} />
+          </div>
+        </div>
+
+        <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderLeft: '4px solid #ef4444', borderRadius: '4px', padding: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8b949e' }}>BACKUP GENERATOR</span>
+            <Fuel size={14} color="#ef4444" />
+          </div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: genActive ? '#ef4444' : '#22c55e' }}>{genActive ? 'ACTIVE' : 'STANDBY'}</div>
+          <div style={{ fontSize: '0.6rem', color: '#8b949e', marginTop: '0.25rem' }}>
+            Fuel: {powerTel.genFuel.toFixed(0)}% | Output: {powerTel.genOutput.toFixed(0)} kW
+          </div>
+          <button onClick={() => setGenActive(!genActive)}
+            style={{ marginTop: '0.4rem', padding: '3px 10px', borderRadius: '3px', fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer', background: genActive ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.1)', border: `1px solid ${genActive ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.2)'}`, color: genActive ? '#ef4444' : '#22c55e', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {genActive ? 'DEACTIVATE' : 'ACTIVATE'}
+          </button>
+        </div>
+
+        <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderLeft: '4px solid #06b6d4', borderRadius: '4px', padding: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8b949e' }}>BATTERY STORAGE</span>
+            <Battery size={14} color="#06b6d4" />
+          </div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff' }}>{powerTel.batteryCharge.toFixed(0)}%</div>
+          <div style={{ fontSize: '0.6rem', color: '#8b949e', marginTop: '0.25rem' }}>
+            Temp: {powerTel.batteryTemp.toFixed(1)}°C | {batteryCharging ? 'CHARGING' : 'DISCHARGING'} | 2.4 MWh LFP
+          </div>
+          <button onClick={() => setBatteryCharging(!batteryCharging)}
+            style={{ marginTop: '0.4rem', padding: '3px 10px', borderRadius: '3px', fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer', background: batteryCharging ? 'rgba(6,182,212,0.1)' : 'rgba(249,115,22,0.1)', border: `1px solid ${batteryCharging ? 'rgba(6,182,212,0.3)' : 'rgba(249,115,22,0.3)'}`, color: batteryCharging ? '#22d3ee' : '#f97316', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {batteryCharging ? 'DISCHARGE' : 'CHARGE'}
+          </button>
+        </div>
+
+        <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderLeft: '4px solid var(--accent)', borderRadius: '4px', padding: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8b949e' }}>POWER USAGE EFFECTIVENESS</span>
+            <Gauge size={14} color="var(--accent)" />
+          </div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff' }}>
+            {((totalPowerKW * 1000 + powerTel.upsLoad * 5 + powerTel.genOutput) / (totalPowerKW * 1000 + 1) * 0.92).toFixed(3)}
+          </div>
+          <div style={{ fontSize: '0.6rem', color: '#8b949e', marginTop: '0.25rem' }}>
+            pPUE | Site Power: {(totalPowerKW + (powerTel.upsLoad * 5 + powerTel.genOutput) / 1000).toFixed(2)} kW
+          </div>
         </div>
 
       </div>

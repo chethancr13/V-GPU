@@ -151,11 +151,11 @@ import torch
 
 # Load on standard cloud instance (Tesla T4)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = load_remote_model("bench_utils.py").to(device)
+model = load_remote_model("my_ml_model.py").to(device)
 
 # Remote network dataset pull
 import pandas as pd
-dataset = pd.read_csv("https://storage.googleapis.com/vgpu-data/my_data.csv")
+dataset = pd.read_csv("https://storage.googleapis.com/vgpu-data/messy_sales - Sheet1.csv")
 # Run real shared cloud training loop
 model.train(dataset, epochs=30)
 print("Colab shared cell completed.")

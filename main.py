@@ -191,11 +191,231 @@ async def provision_vgpu(request: Request, vram_mb: Optional[int] = None, comput
     raise HTTPException(status_code=400, detail="No physical GPU has enough capacity.")
 
 @app.delete("/api/vgpu/{vgpu_id}")
-async def destroy_vgpu(vgpu_id: str):
+async def delete_vgpu(vgpu_id: str):
     for gpu in physical_gpus:
         if gpu.destroy_vgpu_instance(vgpu_id):
-            return {"status": "destroyed"}
-    raise HTTPException(status_code=404, detail="V-GPU instance not found")
+            return {"status": "success", "message": f"vGPU {vgpu_id} destroyed"}
+    raise HTTPException(status_code=404, detail=f"vGPU instance {vgpu_id} not found")
+
+class ChatRequest(BaseModel):
+    message: str
+    active_tab: str
+    history: Optional[List[Dict[str, str]]] = []
+
+async def handle_agent_chat(message: str, active_tab: str, history: List[Dict[str, str]], api_key: Optional[str]) -> Dict:
+    import urllib.request
+    import json
+    
+    msg_lower = message.lower()
+    
+    # Load commands.md dynamically at runtime
+    commands_doc = ""
+    try:
+        if os.path.exists("COMMANDS.md"):
+            with open("COMMANDS.md", "r") as f:
+                commands_doc = f.read()
+    except Exception as doc_err:
+        print(f"Error loading COMMANDS.md: {doc_err}")
+    
+    # Define local mapping for navigation keywords
+    navigation_map = {
+        "dashboard": ["dashboard", "home", "main page", "overview", "landing"],
+        "gpu_monitor": ["monitor", "telemetry", "temp", "temperature", "power", "charts", "utilization", "realtime", "real-time", "graphs"],
+        "ai_data_center": ["datacenter", "data center", "fleet", "topology", "cluster", "nodes", "3d view"],
+        "water_resource": ["water", "cooling", "green", "carbon", "efficiency", "environmental", "eco", "planner"],
+        "comparison": ["compare", "comparison", "benchmark", "jupyter", "colab", "speed"],
+        "vgpu": ["provision", "allocate", "vram", "create vgpu", "destroy vgpu", "delete vgpu", "vgpu manager"],
+        "vm_inspector": ["inspector", "vm", "container", "docker", "spec", "cpu-z", "cpu z", "hardware"],
+        "graphics": ["render", "graphics", "surveillance", "viewports", "3d render", "visualize"],
+        "logs": ["logs", "stdout", "stderr", "output", "terminal"]
+    }
+    
+    detected_tab = None
+    for tab_id, keywords in navigation_map.items():
+        if any(kw in msg_lower for kw in keywords):
+            detected_tab = tab_id
+            break
+
+    # If API Key is present, try Gemini
+    if api_key:
+        system_instruction = f"""
+You are V-GPU Copilot, an advanced production-ready AI agent embedded in the V-GPU (Virtual GPU) control plane platform.
+V-GPU is a monolith system simulating physical NVIDIA GPUs and provisioning them as isolated Docker container workloads (vGPUs) with strict VRAM and compute allocations.
+
+Your task is to answer user queries and optionally navigate the application to the relevant page.
+You are fully conversational and should handle greetings, general check-ins, small talk, and project queries like ChatGPT or Gemini.
+
+### UI Workspace Tabs:
+- 'dashboard': Overall cluster status, scheduling stats, physical GPUs.
+- 'gpu_monitor': Live graphs of compute load, memory, temperature, and power.
+- 'ai_data_center': 3D datacenter node visualization and live job execution.
+- 'water_resource': Environmental cooling impact, carbon intensity, green compute.
+- 'comparison': Side-by-side PyTorch execution benchmarks vs Jupyter and Colab.
+- 'vgpu': Provisioning interface for custom vGPU nodes (setting VRAM/compute).
+- 'vm_inspector': Hypervisor, Docker container limits, CPU-Z hardware specs.
+- 'graphics': Live 3D shape/wireframe render views from vGPU stress testing.
+- 'logs': Live execution stdout/stderr logs.
+
+### V-GPU Codebase Architecture & File Roles:
+- `main.py`: The monolithic FastAPI backend entry point. Defines routes for dataset management, script uploads, vGPU provisioning (`/api/vgpu/provision`), job executions (`/api/jobs/ml`), real-time metrics websockets (`/ws/metrics`), and graphic rendering streams (`/ws/render/{{vgpu_id}}`).
+- `core/vgpu_driver.py`: Lower-level simulation of physical GPUs and custom sliced vGPU instances. Handles memory capacity and compute limit boundaries.
+- `core/scheduler.py`: A queue-based FIFO scheduling manager that monitors vGPU cluster load, selects nodes with sufficient headroom, and launches jobs.
+- `core/isolation.py`: Background enforcement agent that checks active vGPU containers every second and applies strict resource quotas.
+- `core/job_executor.py`: Spawns ML workloads inside Docker containers matching the provisioned `vgpu-worker` image.
+- `core/benchmark_runner.py`: Orchestrates comparative benchmarks (speed/energy consumption) for PyTorch code on V-GPU, local Jupyter, and Google Colab.
+- `scripts/start_dev.py`: Automated developer startup orchestrator (checks Docker daemon, builds worker image, syncs host-VM clocks, spins up Uvicorn, and boots Tauri Vite frontend).
+- `vgpu_launcher.py`: Python command-line utility for launching, executing jobs, and container garbage collection.
+
+### Command Reference Guide:
+{commands_doc}
+
+### Response Output Schema:
+Your response MUST be a JSON object containing exactly two fields:
+{{
+  "text": "Your conversational markdown-formatted answer to the user. Use clear bullet points, code blocks, and bolding where appropriate. Respond warmly and naturally to conversational prompts (greetings, small talk, etc.).",
+  "navigate": "one of the tab IDs listed above if the user wants to go to, see, or open that tab/screen/metric, otherwise null"
+}}
+Keep answers clear, highly technical, and conversational.
+"""
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+            
+            # Format chat history
+            contents = []
+            if history:
+                for h in history:
+                    contents.append({
+                        "role": "user" if h.get("role") == "user" else "model",
+                        "parts": [{"text": h.get("content", h.get("text", ""))}]
+                    })
+            contents.append({
+                "role": "user",
+                "parts": [{"text": message}]
+            })
+            
+            payload = {
+                "contents": contents,
+                "systemInstruction": {
+                    "parts": [{"text": system_instruction}]
+                },
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "temperature": 0.2
+                }
+            }
+            
+            def call_api():
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=8) as res:
+                    return res.read().decode("utf-8")
+                    
+            loop = asyncio.get_event_loop()
+            raw_res = await loop.run_in_executor(None, call_api)
+            res_data = json.loads(raw_res)
+            
+            text_out = res_data["candidates"][0]["content"]["parts"][0]["text"]
+            parsed_json = json.loads(text_out)
+            
+            nav = parsed_json.get("navigate")
+            if nav not in navigation_map:
+                nav = None
+                
+            return {
+                "text": parsed_json.get("text", ""),
+                "navigate": nav or detected_tab
+            }
+        except Exception as e:
+            print(f"Gemini API failure, falling back to local engine: {e}")
+
+    # Local fallback engine
+    response_text = ""
+    
+    # 1. Navigation handling
+    if detected_tab == "dashboard":
+        response_text = "Navigating to the **Dashboard**. Here you can monitor overall system health, total active vGPUs, scheduler stats, and active jobs."
+    elif detected_tab == "gpu_monitor":
+        response_text = "Opening the **GPU Monitor** panel. This tab displays real-time telemetry graphs for the physical GPUs, showing compute load, temperature, power draw, and VRAM utilization."
+    elif detected_tab == "ai_data_center":
+        response_text = "Welcome to the **AI Data Center**! This tab displays a 3D visualization of the server racks, nodes, and cluster telemetry. You can track parallel executions across the cluster."
+    elif detected_tab == "water_resource":
+        response_text = "Navigating to the **Water & Resource** tab. Here you can plan and estimate the environmental impact of your workloads, specifically modeling water cooling rates and carbon offset coefficients."
+    elif detected_tab == "comparison":
+        response_text = "Navigating to the **Speed Comparison** benchmark. In this panel, you can run training workloads across V-GPU, local Jupyter, and Google Colab to compare execution times and energy efficiency side-by-side."
+    elif detected_tab == "vgpu":
+        response_text = "Opening the **vGPU Manager** tab. Here you can provision isolated Virtual GPU slices (assigning custom VRAM and compute percentage limits) or destroy inactive instances."
+    elif detected_tab == "vm_inspector":
+        response_text = "Navigating to the **VM Inspector** (CPU-Z). Here you can see underlying hardware properties, CPU instructions, CUDA versions, hypervisor metadata, and specific Docker container allocations."
+    elif detected_tab == "graphics":
+        response_text = "Opening the **Graphics Viewer** (Tauri WebSocket Renderer). Here you can preview real-time 3D graphics rendered inside your vGPU containers (useful for GPU stress testing)."
+    elif detected_tab == "logs":
+        response_text = "Navigating to the **Logs** tab. Here you can view live stdout/stderr log outputs from current training jobs and scheduling queues."
+
+    # Upgrade Offline Conversational Fallback
+    # Check for greetings
+    greetings = ["hello", "hi", "hey", "good morning", "good afternoon", "good evening", "how's it going", "greetings"]
+    is_greeting = any(msg_lower.startswith(g) or f" {g} " in f" {msg_lower} " for g in greetings)
+    
+    # Check for "how are you"
+    how_are_you = ["how are you", "how are u", "how you doing", "doing well"]
+    is_how_are_you = any(h in msg_lower for h in how_are_you)
+    
+    # Check for small talk / appreciation
+    appreciation = ["thank you", "thanks", "awesome", "great", "cool", "perfect", "good job"]
+    is_appreciation = any(msg_lower.startswith(a) or f" {a} " in f" {msg_lower} " for a in appreciation)
+        
+    # 2. Command or info queries
+    if not response_text:
+        if is_how_are_you:
+            response_text = "I am doing great, thank you for asking! I'm here in your V-GPU workspace ready to help you provision nodes, manage ML jobs, or navigate to any panel. How are you doing today?"
+        elif is_greeting:
+            response_text = "Hello! I am your V-GPU Copilot. I'm here to guide you through this project. How can I help you manage your virtual GPU environment or navigate the platform today?"
+        elif is_appreciation:
+            response_text = "You're very welcome! I'm glad I could help. Let me know if you need anything else, like provisioning a vGPU node or explaining the scheduler mechanics!"
+        elif "what is" in msg_lower and "project" in msg_lower:
+            response_text = "This project, **V-GPU**, is an NVIDIA-inspired virtual GPU control plane that simulates physical GPUs, slices their compute/VRAM capacity, runs isolated ML training jobs inside Docker containers, and charts real-time performance telemetry. It includes scheduling queues, water-cooling environmental planners, and speed benchmarks compared to Jupyter and Google Colab."
+        elif "vgpu_driver" in msg_lower or "driver" in msg_lower:
+            response_text = "The driver simulator is located in [core/vgpu_driver.py](file:///Users/chethanr/Downloads/V-GPU/core/vgpu_driver.py). It models physical GPU frames and allocates virtual nodes with custom parameters."
+        elif "scheduler" in msg_lower:
+            response_text = "The scheduler is in [core/scheduler.py](file:///Users/chethanr/Downloads/V-GPU/core/scheduler.py). It maintains a queue of ML workloads, checks resources across cluster nodes, and assigns execution slots."
+        elif "isolation" in msg_lower:
+            response_text = "Isolation enforcement is handled by [core/isolation.py](file:///Users/chethanr/Downloads/V-GPU/core/isolation.py). It verifies Docker memory bounds and CPU usage every second to ensure stable virtualization."
+        elif "executor" in msg_lower or "job" in msg_lower:
+            response_text = "ML job execution is managed by [core/job_executor.py](file:///Users/chethanr/Downloads/V-GPU/core/job_executor.py). It launches python scripts inside Docker containers using the `vgpu-worker` image."
+        elif "start_dev" in msg_lower or "orchestrator" in msg_lower:
+            response_text = "The developer orchestrator is at [scripts/start_dev.py](file:///Users/chethanr/Downloads/V-GPU/scripts/start_dev.py). It automates launching Docker Desktop, building the worker container image, syncing clocks, running the backend server, and launching Vite dev server."
+        elif "provision" in msg_lower or "create" in msg_lower or "allocate" in msg_lower:
+            response_text = "To provision a new virtual GPU node:\n1. Navigate to the **vGPU Manager** tab (or ask me: *'Go to vGPU Manager'*).\n2. Under 'Provision New vGPU Node', select your desired **VRAM Limit** (e.g. 4096 MB) and **Compute Speed** limit (e.g. 50%).\n3. Click **Provision Node**.\n\nThe scheduler will automatically select a physical GPU with spare capacity, start an isolated Docker container, and return the instance ID."
+        elif "ml job" in msg_lower or "run job" in msg_lower or "run model" in msg_lower or "training" in msg_lower:
+            response_text = "You can run Machine Learning scripts on the provisioned cluster using the Python launcher. Open your terminal in the workspace and run:\n```bash\n# Run a script with auto-provisioning\npython3 vgpu_launcher.py run my_ml_model.py auto\n\n# Run on all nodes in parallel (split dataset workload)\npython3 vgpu_launcher.py run-parallel my_ml_model.py data1.csv data2.csv\n```"
+        elif "water" in msg_lower or "cooling" in msg_lower or "green" in msg_lower:
+            response_text = "The **Water & Resource** tool acts as a green-compute planner. It helps you design workloads to minimize ecological impact. You can adjust PUE (Power Usage Effectiveness), grid carbon intensity, and cooling efficiency to simulate the gallons of water consumed per training run."
+        elif "docker" in msg_lower or "container" in msg_lower:
+            response_text = "Each vGPU is containerized inside an isolated Docker environment using custom CGroups limits. The backend's `isolation_manager` (`core/isolation.py`) runs a background loop every second enforcing strict memory bounds and pinning processes to dedicated GPU resources to ensure fair scheduling."
+        elif "benchmark" in msg_lower or "colab" in msg_lower or "jupyter" in msg_lower:
+            response_text = "Under the **Speed Comparison** tab, you can compare V-GPU training execution speeds directly against Google Colab cells and local Jupyter Notebook instances. V-GPU achieves high throughput by bypassing typical local network bottlenecks and utilizing dedicated InfiniBand-connected tensor core sharding."
+        elif "commands" in msg_lower or "how to run" in msg_lower or "cli" in msg_lower:
+            response_text = "Common V-GPU launcher commands:\n- **Start GUI & Backend**: `python3 vgpu_launcher.py` (or `npm run tauri dev`)\n- **Run ML Job**: `python3 vgpu_launcher.py run <script.py> [vgpu_id] [dataset]`\n- **Clean and Reset all containers**: `python3 vgpu_launcher.py clean`"
+        elif "who are you" in msg_lower or "help" in msg_lower or "what can you do" in msg_lower:
+            response_text = "I am the **V-GPU Copilot**. I can explain how the vGPU orchestration architecture works, guide you through provisioning/running jobs, and help you navigate between tabs. Try asking: *'Take me to the GPU Monitor'* or *'How does isolation work?'*"
+        else:
+            response_text = "I understand you are asking about V-GPU. I am a local assistant dedicated to this project. I can help you with:\n\n- **Navigation**: Ask me to go to the Dashboard, GPU Monitor, Logs, or VM Inspector.\n- **Command Reference**: Learn how to run workloads via `vgpu_launcher.py`.\n- **Architecture Q&A**: Get information about resource isolation, scheduler load balancing, or water compute planning.\n\n*Tip: Connect your Gemini API Key in the Copilot settings drawer to enable dynamic conversation!*"
+
+    return {
+        "text": response_text,
+        "navigate": detected_tab
+    }
+
+@app.post("/api/agent/chat")
+async def agent_chat(req: ChatRequest, request: Request):
+    user_key = request.headers.get("x-gemini-key")
+    api_key = user_key or os.environ.get("GEMINI_API_KEY")
+    res = await handle_agent_chat(req.message, req.active_tab, req.history, api_key)
+    return res
 
 class JobRequest(BaseModel):
     vgpu_id: str

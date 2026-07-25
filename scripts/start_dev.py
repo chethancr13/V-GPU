@@ -52,6 +52,14 @@ def sync_docker_time():
     except Exception as e:
         print(f" Warning: Could not sync clock: {e}")
 
+def get_python_executable():
+    for venv_dir in [".venv", "venv"]:
+        for bin_dir, exe in [("bin", "python"), ("bin", "python3"), ("Scripts", "python.exe")]:
+            candidate = os.path.join(os.getcwd(), venv_dir, bin_dir, exe)
+            if os.path.exists(candidate):
+                return candidate
+    return sys.executable
+
 def main():
     # Set CWD to root directory
     os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -64,8 +72,9 @@ def main():
         
     print(" Starting V-GPU Backend...")
     # Start the backend uvicorn process
+    python_exe = get_python_executable()
     backend_process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"],
+        [python_exe, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"],
         env={**os.environ, "PYTHONPATH": os.getcwd()}
     )
     

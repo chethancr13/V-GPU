@@ -33,8 +33,15 @@ function VGPUManager() {
   })
 
   const destroyMutation = useMutation({
-    mutationFn: (vgpuId) => fetch(`http://localhost:8000/api/vgpu/${vgpuId}`, { method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries(['vgpus'])
+    mutationFn: (vgpuId) => fetch(`http://localhost:8000/api/vgpu/${vgpuId}`, { method: 'DELETE' }).then(res => {
+      if (!res.ok) {
+        return res.json().then(err => { throw new Error(err.detail || 'Failed to destroy vGPU instance') })
+      }
+      return res.json()
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['vgpus'])
+    }
   })
 
   const handleProvision = () => {

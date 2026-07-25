@@ -151,10 +151,10 @@ from core_models import load_custom_model_structure
 
 # Single physical device mapping
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = load_custom_model_structure("bench_utils.py").to(device)
+model = load_custom_model_structure("my_ml_model.py").to(device)
 
 # Standard local file read (PCIe bottleneck)
-dataset = load_local_csv("./data/my_data.csv")
+dataset = load_local_csv("./data/messy_sales - Sheet1.csv")
 # Run real local host training loop
 model.train(dataset, epochs=30)
 print("Jupyter Local run completed.")
