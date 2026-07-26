@@ -106,9 +106,11 @@ def main():
         if command == "clean":
             print(" Cleaning up all vGPU instances and containers...")
             try:
-                # 1. Kill backend and frontend processes by port
-                print(" Stopping backend and frontend...")
-                subprocess.run("lsof -ti:8000,5173 | xargs kill -9", shell=True, stderr=subprocess.DEVNULL)
+                if sys.platform == "win32":
+                    subprocess.run("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :8000') do taskkill /f /pid %a", shell=True, stderr=subprocess.DEVNULL)
+                    subprocess.run("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :5173') do taskkill /f /pid %a", shell=True, stderr=subprocess.DEVNULL)
+                else:
+                    subprocess.run("lsof -ti:8000,5173 | xargs kill -9", shell=True, stderr=subprocess.DEVNULL)
                 
                 # 2. Cleanup Docker
                 import docker

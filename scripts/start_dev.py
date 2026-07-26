@@ -27,6 +27,21 @@ def check_and_start_docker():
                 return True
         print(" Docker failed to start in time.")
         return False
+    elif sys.platform == "win32":
+        print(" Docker is not running. Starting Docker Desktop on Windows...")
+        docker_path = os.path.expandvars("%ProgramFiles%\\Docker\\Docker\\Docker Desktop.exe")
+        if os.path.exists(docker_path):
+            subprocess.Popen([docker_path])
+            for _ in range(22):
+                time.sleep(2)
+                if is_docker_running():
+                    print(" Docker started successfully.")
+                    return True
+            print(" Docker failed to start in time.")
+            return False
+        else:
+            print(" Docker Desktop not found at default installation path.")
+            return False
     else:
         print(" Docker is not running. Please start Docker first.")
         return False
