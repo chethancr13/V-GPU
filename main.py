@@ -1,7 +1,9 @@
 import asyncio
 import time
 import os
+import sys
 import shutil
+import subprocess
 import uuid
 import random
 from typing import Optional, List, Dict
@@ -96,6 +98,26 @@ async def startup_event():
             print(" [Startup] Default vGPU fleet nodes provisioned successfully.")
     except Exception as e:
         print(f" [Startup] Warning: Failed to auto-provision default vGPU nodes: {e}")
+
+    # Auto-open the Hypervisor & Slicing monitor window in the default browser
+    async def open_monitor_window():
+        try:
+            await asyncio.sleep(2.0)  # let the server finish binding before the websocket connects
+            monitor_url = os.path.abspath("hypervisor_slicing.html")
+            if os.path.exists(monitor_url):
+                if sys.platform == "win32":
+                    os.startfile(monitor_url)  # type: ignore[attr-defined]
+                elif sys.platform == "darwin":
+                    subprocess.Popen(["open", monitor_url])
+                else:
+                    subprocess.Popen(["xdg-open", monitor_url])
+                print(" [Startup] Opened Hypervisor & Slicing monitor window.")
+            else:
+                print(" [Startup] hypervisor_slicing.html not found; skipping auto-open.")
+        except Exception as e:
+            print(f" [Startup] Warning: Failed to open monitor window: {e}")
+
+    asyncio.create_task(open_monitor_window())
 
 # Global state for tracking ML jobs & scheduling
 recent_jobs = []

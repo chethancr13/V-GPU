@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>V-GPU Hypervisor &amp; Slicing Monitor</title>
+<style>
+  :root {
+    --black: #050505;
+    --dark-gray: #0d0d0d;
+    --gray: #141414;
+    --light-gray: #1a1a1a;
+    --border: #262626;
+    --text-primary: #f5f5f5;
+    --text-secondary: #b0b0b0;
+    --text-muted: #6b6b6b;
+    --accent: #76B900;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--black); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 1.5rem; background: var(--dark-gray); border-bottom: 1px solid var(--border);
+  }
+  .topbar-title { display: flex; align-items: center; gap: 0.6rem; }
+  .topbar-title h1 { font-size: 1.1rem; margin: 0; font-weight: 800; letter-spacing: 0.04em; }
+  .conn { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; font-weight: 700; padding: 0.4rem 0.8rem; border-radius: 4px; border: 1px solid var(--border); background: var(--gray); }
+  .conn .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .conn.online { color: var(--accent); }
+  .conn.online .dot { background: var(--accent); animation: pulse 1.2s infinite; }
+  .conn.offline { color: #ef4444; }
+  .conn.offline .dot { background: #ef4444; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .wrap { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .phys-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); gap: 1.5rem; }
+  .phys { background: var(--dark-gray); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .phys-hd { padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: var(--gray); }
+  .phys-name { display: flex; align-items: center; gap: 0.6rem; }
+  .chip { background: rgba(118,185,0,0.12); border: 1px solid rgba(118,185,0,0.3); color: var(--accent); font-size: 0.6rem; font-weight: 800; letter-spacing: 0.05em; padding: 0.2rem 0.5rem; border-radius: 4px; }
+  .hypervisor-badge { font-size: 0.62rem; color: var(--text-secondary); background: var(--light-gray); border: 1px solid var(--border); padding: 0.22rem 0.5rem; border-radius: 4px; font-family: Menlo, monospace; }
+
+  .phys-stats { display: flex; gap: 1.25rem; padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .stat { display: flex; flex-direction: column; }
+  .stat .k { font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat .v { font-size: 1.05rem; font-weight: 800; margin-top: 0.1rem; }
+
+  .slice-wrap { padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
+  .slice-label { font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.05em; }
+
+  .pool { position: relative; height: 21px; width: 100%; background: #0a0a0a; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; display: flex; }
+  .pool-seg { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.58rem; font-weight: 800; overflow: hidden; white-space: nowrap; border-right: 1px solid rgba(0,0,0,0.4); transition: width 0.4s ease; }
+  .pool-seg.free { background: #1f1f1f; color: var(--text-muted); }
+  .pool-seg.alloc { background: linear-gradient(180deg,#9be11c,#6fa500); color: #000; }
+  .pool-seg.alloc2 { background: linear-gradient(180deg,#5aa0ff,#2f6fd6); color: #fff; }
+  .pool-seg.alloc3 { background: linear-gradient(180deg,#ffd14d,#d9a300); color: #222; }
+  .pool-seg.alloc4 { background: linear-gradient(180deg,#ff7a6b,#e03e2f); color: #fff; }
+
+  .slice-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.7rem; }
+  .slice { background: var(--gray); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .slice-hd { display: flex; justify-content: space-between; align-items: center; }
+  .slice-hd .name { font-size: 0.78rem; font-weight: 800; font-family: Menlo, monospace; }
+  .slice-hd .pct { font-size: 0.7rem; font-weight: 800; color: var(--accent); }
+  .slice-meta { display: flex; flex-direction: column; gap: 0.25rem; }
+  .slice-meta .row { display: flex; justify-content: space-between; font-size: 0.66rem; color: var(--text-secondary); }
+  .slice-meta .row b { color: var(--text-primary); font-weight: 700; }
+  .mini-bar { height: 5px; background: #050505; border-radius: 3px; overflow: hidden; }
+  .mini-bar > div { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.4s ease; }
+
+  .legend { display: flex; gap: 1.2rem; flex-wrap: wrap; font-size: 0.68rem; color: var(--text-secondary); }
+  .legend .item { display: flex; align-items: center; gap: 0.4rem; }
+  .legend .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  .topstats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; }
+  .topstat { background: var(--dark-gray); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; }
+  .topstat .k { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .topstat .v { font-size: 1.4rem; font-weight: 800; margin-top: 0.3rem; }
+
+  .empty { border: 1px dashed var(--border); border-radius: 6px; padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
+</style>
+</head>
+<body onload="connect()">
+
+<div class="topbar">
+  <div class="topbar-title">
+    <span style="color: var(--accent); font-size: 1.3rem;">◆</span>
+    <h1>Hypervisor &amp; Slicing Monitor</h1>
+  </div>
+  <div id="conn" class="conn offline"><span class="dot"></span><span id="connText">CONNECTING…</span></div>
+</div>
+
+<div class="wrap">
+
+  <!-- Cluster overview -->
+  <div id="topstats" class="topstats"></div>
+
+  <!-- Live slicing view -->
+  <div class="legend">
+    <div class="item"><span class="sw" style="background:#1f1f1f;border:1px solid var(--border);"></span>Free VRAM</div>
+    <div class="item"><span class="sw" style="background:#8fdc14;"></span>Allocated slice</div>
+    <div class="item"><span class="sw" style="background:#5aa0ff;"></span>Slice 2</div>
+    <div class="item"><span class="sw" style="background:#ffd14d;"></span>Slice 3+</div>
+  </div>
+
+  <div id="physGrid" class="phys-grid">
+    <div class="empty">Waiting for telemetry… (backend on :8000?)</div>
+  </div>
+</div>
+
+<script>
+  const PALETTE = ['alloc','alloc2','alloc3','alloc4'];
+  const COLORS  = ['#8fdc14','#5aa0ff','#ffd14d','#ff7a6b'];
+
+  let ws = null, retryTimer = null;
+  const connEl = document.getElementById('conn');
+  const connText = document.getElementById('connText');
+
+  function setConn(ok){
+    connEl.className = 'conn ' + (ok?'online':'offline');
+    connText.textContent = ok ? 'HYPERVISOR ONLINE · SYNCED' : 'OFFLINE — retrying…';
+  }
+  function connect(){
+    try { ws = new WebSocket('ws://localhost:8000/ws/metrics'); }
+    catch(e){ setConn(false); scheduleRetry(); return; }
+    ws.onopen = () => setConn(true);
+    ws.onclose = () => { setConn(false); scheduleRetry(); };
+    ws.onerror = () => { try{ ws.close(); }catch(e){} };
+    ws.onmessage = ev => { try { render(JSON.parse(ev.data)); } catch(e){ console.error(e); } };
+  }
+  function scheduleRetry(){
+    if (retryTimer) return;
+    retryTimer = setTimeout(() => { retryTimer = null; connect(); }, 3000);
+  }
+
+  function render(d){
+    const gpus = d.physical_gpus || [];
+    const vgpus = d.vgpu_instances || [];
+
+    // Top overview stats
+    const totalVram = gpus.reduce((s,g)=>s+(g.memory_total||0),0);
+    const usedVram  = gpus.reduce((s,g)=>s+(g.memory_used||0),0);
+    const totalPct  = totalVram ? (usedVram/totalVram)*100 : 0;
+    const avgLoad   = gpus.length ? gpus.reduce((s,g)=>s+(g.gpu_utilization||0),0)/gpus.length : 0;
+    const avgTemp   = gpus.length ? gpus.reduce((s,g)=>s+(g.temperature||0),0)/gpus.length : 0;
+
+    document.getElementById('topstats').innerHTML = [
+      ['Physical GPUs', gpus.length],
+      ['vGPU Slices', vgpus.length],
+      ['Cluster Load', avgLoad.toFixed(1)+'%'],
+      ['VRAM Pool', totalPct.toFixed(1)+'%'],
+      ['Avg Temp', avgTemp.toFixed(1)+'°C']
+    ].map(([k,v]) => `<div class="topstat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+
+    if (!gpus.length){ document.getElementById('physGrid').innerHTML = '<div class="empty">No physical GPU telemetry yet.</div>'; return; }
+
+    const grid = document.getElementById('physGrid');
+    grid.innerHTML = '';
+
+    const allVgpus = vgpus.slice().sort((a,b)=>b.vram_limit-a.vram_limit);
+
+    gpus.forEach((gpu, idx) => {
+      const totalVram = gpu.memory_total || 32768;
+
+      // Distribute slices across hosts proportional to each host's share (list_instances omits physical_gpu_id)
+      const gpuWeight = totalVram;
+      const totalWeight = gpus.reduce((s,g)=>s+(g.memory_total||0),1);
+      let sliceCount = allVgpus.length ? Math.max(1, Math.round((gpuWeight/totalWeight)*allVgpus.length)) : 0;
+      const assigned = allVgpus.splice(0, sliceCount);
+      const allocVram = assigned.reduce((s,x)=>s+x.vram_limit,0);
+      const freeVram  = Math.max(0, totalVram - allocVram);
+
+      let poolHtml = '';
+      assigned.forEach((s,i) => {
+        const w = (s.vram_limit/totalVram)*100;
+        poolHtml += `<div class="pool-seg ${PALETTE[i%PALETTE.length]}" style="width:${w.toFixed(2)}%">${(s.vram_limit/1024).toFixed(1)}G</div>`;
+      });
+      poolHtml += `<div class="pool-seg free" style="width:${((freeVram/totalVram)*100).toFixed(2)}%">${(freeVram/1024).toFixed(1)}G free</div>`;
+
+      let listHtml = '<div class="empty">No vGPU slices on this host.</div>';
+      if (assigned.length){
+        listHtml = assigned.map(s => `<div class="slice">
+          <div class="slice-hd">
+            <span class="name">node-${s.id.substring(0,8)}</span>
+            <span class="pct">${s.compute_limit}%</span>
+          </div>
+          <div class="slice-meta">
+            <div class="row"><span>VRAM slice</span><b>${(s.vram_limit/1024).toFixed(1)} GB</b></div>
+            <div class="row"><span>Compute</span><b>${s.compute_limit}%</b></div>
+            <div class="row"><span>Docker</span><b style="color:var(--text-muted)">${s.container_id ? s.container_id.substring(0,12) : 'simulated'}</b></div>
+            <div class="mini-bar"><div style="width:${Math.min(100,s.compute_limit)}%"></div></div>
+          </div>
+        </div>`).join('');
+      }
+
+      const card = document.createElement('div');
+      card.className = 'phys';
+      card.innerHTML = `
+        <div class="phys-hd">
+          <div class="phys-name">
+            <span style="font-weight:800;font-size:1.05rem;">GPU-${idx}</span>
+            <span class="chip">PHYSICAL</span>
+          </div>
+          <div class="hypervisor-badge">virt-managed ▸ ${assigned.length} slice(s)</div>
+        </div>
+        <div class="phys-stats">
+          <div class="stat"><span class="k">Load</span><span class="v">${(gpu.gpu_utilization||0).toFixed(1)}%</span></div>
+          <div class="stat"><span class="k">VRAM used</span><span class="v">${((gpu.memory_used||0)/1024).toFixed(1)} GB</span></div>
+          <div class="stat"><span class="k">Temp</span><span class="v">${(gpu.temperature||0).toFixed(0)}°C</span></div>
+          <div class="stat"><span class="k">Power</span><span class="v">${(gpu.power_draw||0).toFixed(0)}W</span></div>
+          <div class="stat"><span class="k">Total VRAM</span><span class="v">${(totalVram/1024).toFixed(0)} GB</span></div>
+        </div>
+        <div class="slice-wrap">
+          <div class="slice-label">VRAM POOL — carved into vGPU slices</div>
+          <div class="pool">${poolHtml}</div>
+          <div class="slice-label" style="margin-top:0.5rem;">Provisioned slices (${assigned.length})</div>
+          ${listHtml}
+        </div>`;
+      grid.appendChild(card);
+    });
+  }
+</script>
+</body>
+</html>
