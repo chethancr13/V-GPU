@@ -94,6 +94,119 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ─── HIGH-TECH GLOWING NAVY GRADIENT BACKGROUND (Dark Mode only) ─── */
+html:not([data-theme="light"]) body,
+html:not([data-theme="light"]) main,
+html:not([data-theme="light"]) div[style*="background: var(--black)"],
+html:not([data-theme="light"]) div[style*="background: var(--surface-0)"],
+html:not([data-theme="light"]) div[style*="background-color: var(--black)"],
+html:not([data-theme="light"]) div.page-container {
+  background: radial-gradient(circle at 85% 90%, rgba(0, 80, 240, 0.18) 0%, transparent 60%),
+              radial-gradient(circle at 15% 100%, rgba(0, 160, 255, 0.09) 0%, transparent 50%),
+              #020617 !important; /* Deep slate blue-black background */
+}
+
+/* ─── LIQUID GLASS BACKGROUND BLOBS ─── */
+.liquid-blob-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.liquid-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(130px);
+  mix-blend-mode: screen;
+  opacity: 0.16;
+}
+
+[data-theme="light"] .liquid-blob {
+  mix-blend-mode: normal;
+  opacity: 0.07;
+}
+
+.blob-purple {
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, rgba(147, 51, 234, 0.65) 0%, transparent 80%);
+  top: -120px;
+  left: 28%;
+  animation: floatBlob1 28s ease-in-out infinite alternate;
+}
+
+.blob-blue {
+  width: 650px;
+  height: 650px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.55) 0%, transparent 80%);
+  bottom: -220px;
+  right: 12%;
+  animation: floatBlob2 34s ease-in-out infinite alternate;
+}
+
+.blob-pink {
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.45) 0%, transparent 80%);
+  bottom: 18%;
+  left: -80px;
+  animation: floatBlob3 24s ease-in-out infinite alternate;
+}
+
+@keyframes floatBlob1 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(70px, 80px) scale(1.12); }
+  100% { transform: translate(-30px, 140px) scale(0.96); }
+}
+
+@keyframes floatBlob2 {
+  0% { transform: translate(0, 0) scale(1.08); }
+  50% { transform: translate(-80px, -60px) scale(0.92); }
+  100% { transform: translate(50px, -120px) scale(1.04); }
+}
+
+@keyframes floatBlob3 {
+  0% { transform: translate(0, 0) scale(0.92); }
+  50% { transform: translate(120px, -70px) scale(1.18); }
+  100% { transform: translate(-40px, 30px) scale(1); }
+}
+
+/* ─── LIQUID GLASS CARD / ACRYLIC EFFECT ─── */
+html:not([data-theme="light"]) aside.sidebar,
+html:not([data-theme="light"]) header,
+html:not([data-theme="light"]) div[style*="background: var(--gray)"],
+html:not([data-theme="light"]) div[style*="background: var(--dark-gray)"],
+html:not([data-theme="light"]) div[style*="background-color: var(--gray)"],
+html:not([data-theme="light"]) div[style*="background: var(--surface-1)"],
+html:not([data-theme="light"]) div[style*="background-color: var(--surface-1)"],
+html:not([data-theme="light"]) div[style*="background: var(--surface-2)"],
+html:not([data-theme="light"]) div[style*="background-color: var(--surface-2)"] {
+  background: rgba(10, 15, 30, 0.32) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.22) !important;
+}
+
+[data-theme="light"] aside.sidebar,
+[data-theme="light"] header,
+[data-theme="light"] div[style*="background: var(--gray)"],
+[data-theme="light"] div[style*="background: var(--dark-gray)"],
+[data-theme="light"] div[style*="background-color: var(--gray)"],
+[data-theme="light"] div[style*="background: var(--surface-1)"],
+[data-theme="light"] div[style*="background-color: var(--surface-1)"],
+[data-theme="light"] div[style*="background: var(--surface-2)"],
+[data-theme="light"] div[style*="background-color: var(--surface-2)"] {
+  background: rgba(255, 255, 255, 0.52) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.03) !important;
+}
+
 .font-mono {
   font-family: 'JetBrains Mono', monospace;
 }
@@ -210,91 +323,256 @@ select option {
   color: var(--text-muted) !important;
 }
 
-/* ─── LIGHT MODE: Hard-coded dark surface overrides ─────────────────── */
+/* ─── LIGHT MODE OVERRIDES for inline-styled components ────────────── */
+/* These target common hard-coded dark colors used in inline styles */
+[data-theme="light"] input {
+  color: var(--text-primary) !important;
+  background-color: var(--input-bg) !important;
+}
+
+[data-theme="light"] input::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* ─── LIGHT MODE: Comprehensive surface overrides ─────────────────── */
 /*
-  Components use inline styles with hard-coded dark hex values.
-  We override the most common ones here via CSS background-color overrides.
-  These selectors target divs/sections using those specific colors.
+  Components use inline styles with many hard-coded dark hex values.
+  We override all discovered patterns here using both hex and rgb() values.
+  surface-0 = page bg (#f0f2f5)
+  surface-1 = card bg  (#ffffff)
+  surface-2 = section  (#f5f7fa)
+  surface-3 = inset    (#e2e8f0)
 */
 
-/* Surfaces that use #070b0e (deepest dark, e.g. ComputeComparison outer wrap) */
-[data-theme="light"] [style*="background: #070b0e"],
-[data-theme="light"] [style*="background: rgb(7, 11, 14)"],
-[data-theme="light"] [style*="background-color: #070b0e"] {
-  background-color: var(--surface-0) !important;
-  background: var(--surface-0) !important;
-}
-
-/* Surfaces using #0e141a (card backgrounds in ComputeComparison) */
-[data-theme="light"] [style*="background: #0e141a"],
-[data-theme="light"] [style*="background: rgb(14, 20, 26)"],
-[data-theme="light"] [style*="background-color: #0e141a"] {
-  background-color: var(--surface-1) !important;
-  background: var(--surface-1) !important;
-}
-
-/* Surfaces using #0b0b0b */
-[data-theme="light"] [style*="background: #0b0b0b"],
-[data-theme="light"] [style*="background: rgb(11, 11, 11)"],
-[data-theme="light"] [style*="background-color: #0b0b0b"] {
-  background-color: var(--surface-2) !important;
-  background: var(--surface-2) !important;
-}
-
-/* Surfaces using #050505 (deepest black) */
+/* ── Deepest blacks → surface-0 ── */
+[data-theme="light"] [style*="background: #000"],
+[data-theme="light"] [style*="background: #020202"],
 [data-theme="light"] [style*="background: #050505"],
+[data-theme="light"] [style*="background: #050a0f"],
+[data-theme="light"] [style*="background: #070b0e"],
+[data-theme="light"] [style*="background: #070b10"],
+[data-theme="light"] [style*="background: #0a0a0a"],
+[data-theme="light"] [style*="background: #0a0f14"],
+[data-theme="light"] [style*="background: #0b0b0b"],
+[data-theme="light"] [style*="background: #0d0d0d"],
+[data-theme="light"] [style*="background: #0e1014"],
+[data-theme="light"] [style*="background: #0e1017"],
+[data-theme="light"] [style*="background: #0f0f0f"],
+[data-theme="light"] [style*="background: rgb(0, 0, 0)"],
+[data-theme="light"] [style*="background: rgb(2, 2, 2)"],
 [data-theme="light"] [style*="background: rgb(5, 5, 5)"],
-[data-theme="light"] [style*="background-color: #050505"] {
+[data-theme="light"] [style*="background: rgb(5, 10, 15)"],
+[data-theme="light"] [style*="background: rgb(7, 11, 14)"],
+[data-theme="light"] [style*="background: rgb(7, 11, 16)"],
+[data-theme="light"] [style*="background: rgb(10, 10, 10)"],
+[data-theme="light"] [style*="background: rgb(10, 15, 20)"],
+[data-theme="light"] [style*="background: rgb(11, 11, 11)"],
+[data-theme="light"] [style*="background: rgb(13, 13, 13)"],
+[data-theme="light"] [style*="background: rgb(14, 16, 20)"],
+[data-theme="light"] [style*="background: rgb(14, 16, 23)"],
+[data-theme="light"] [style*="background: rgb(15, 15, 15)"],
+[data-theme="light"] [style*="background-color: #050505"],
+[data-theme="light"] [style*="background-color: #070b0e"],
+[data-theme="light"] [style*="background-color: #0a0a0a"],
+[data-theme="light"] [style*="background-color: #0b0b0b"],
+[data-theme="light"] [style*="background-color: #000"],
+[data-theme="light"] [style*="background-color: rgb(0, 0, 0)"],
+[data-theme="light"] [style*="background-color: rgb(5, 5, 5)"],
+[data-theme="light"] [style*="background-color: rgb(7, 11, 14)"],
+[data-theme="light"] [style*="background-color: rgb(10, 10, 10)"],
+[data-theme="light"] [style*="background-color: rgb(11, 11, 11)"] {
   background-color: var(--surface-0) !important;
   background: var(--surface-0) !important;
 }
 
-/* Surfaces using #111111 */
+/* ── Mid-dark surfaces → surface-1 ── */
+[data-theme="light"] [style*="background: #0e141a"],
 [data-theme="light"] [style*="background: #111111"],
-[data-theme="light"] [style*="background: rgb(17, 17, 17)"],
-[data-theme="light"] [style*="background-color: #111111"] {
-  background-color: var(--surface-1) !important;
-  background: var(--surface-1) !important;
-}
-
-/* Surfaces using #111 shorthand */
 [data-theme="light"] [style*="background: #111;"],
-[data-theme="light"] [style*="background-color: #111"] {
+[data-theme="light"] [style*="background: #11161d"],
+[data-theme="light"] [style*="background: #121318"],
+[data-theme="light"] [style*="background: #14161d"],
+[data-theme="light"] [style*="background: #141414"],
+[data-theme="light"] [style*="background: rgb(14, 20, 26)"],
+[data-theme="light"] [style*="background: rgb(17, 17, 17)"],
+[data-theme="light"] [style*="background: rgb(17, 22, 29)"],
+[data-theme="light"] [style*="background: rgb(18, 19, 24)"],
+[data-theme="light"] [style*="background: rgb(20, 20, 20)"],
+[data-theme="light"] [style*="background: rgb(20, 22, 29)"],
+[data-theme="light"] [style*="background-color: #0e141a"],
+[data-theme="light"] [style*="background-color: #111111"],
+[data-theme="light"] [style*="background-color: #111"],
+[data-theme="light"] [style*="background-color: rgb(14, 20, 26)"],
+[data-theme="light"] [style*="background-color: rgb(17, 17, 17)"] {
   background-color: var(--surface-1) !important;
   background: var(--surface-1) !important;
 }
 
-/* Surfaces using #1a1a1a */
+/* ── Dark grays → surface-2 ── */
+[data-theme="light"] [style*="background: #161822"],
+[data-theme="light"] [style*="background: #161922"],
+[data-theme="light"] [style*="background: #181818"],
 [data-theme="light"] [style*="background: #1a1a1a"],
+[data-theme="light"] [style*="background: #1a1d24"],
+[data-theme="light"] [style*="background: #1a1d26"],
+[data-theme="light"] [style*="background: #1c1c1c"],
+[data-theme="light"] [style*="background: #1e1e1e"],
+[data-theme="light"] [style*="background: rgb(22, 24, 34)"],
+[data-theme="light"] [style*="background: rgb(22, 25, 34)"],
+[data-theme="light"] [style*="background: rgb(24, 24, 24)"],
 [data-theme="light"] [style*="background: rgb(26, 26, 26)"],
-[data-theme="light"] [style*="background-color: #1a1a1a"] {
+[data-theme="light"] [style*="background: rgb(26, 29, 36)"],
+[data-theme="light"] [style*="background: rgb(26, 29, 38)"],
+[data-theme="light"] [style*="background: rgb(28, 28, 28)"],
+[data-theme="light"] [style*="background: rgb(30, 30, 30)"],
+[data-theme="light"] [style*="background-color: #1a1a1a"],
+[data-theme="light"] [style*="background-color: rgb(26, 26, 26)"] {
   background-color: var(--surface-2) !important;
   background: var(--surface-2) !important;
 }
 
-/* Surfaces using #0a0a0a */
-[data-theme="light"] [style*="background: #0a0a0a"],
-[data-theme="light"] [style*="background: rgb(10, 10, 10)"],
-[data-theme="light"] [style*="background-color: #0a0a0a"] {
-  background-color: var(--surface-0) !important;
-  background: var(--surface-0) !important;
+/* ── Lighter dark grays → surface-3 ── */
+[data-theme="light"] [style*="background: #1e293b"],
+[data-theme="light"] [style*="background: #222"],
+[data-theme="light"] [style*="background: #222634"],
+[data-theme="light"] [style*="background: #232733"],
+[data-theme="light"] [style*="background: #262b3a"],
+[data-theme="light"] [style*="background: #2a2a2a"],
+[data-theme="light"] [style*="background: #2b3040"],
+[data-theme="light"] [style*="background: #2c3244"],
+[data-theme="light"] [style*="background: #2e3440"],
+[data-theme="light"] [style*="background: #2e3448"],
+[data-theme="light"] [style*="background: #333"],
+[data-theme="light"] [style*="background: #334155"],
+[data-theme="light"] [style*="background: rgb(30, 41, 59)"],
+[data-theme="light"] [style*="background: rgb(34, 34, 34)"],
+[data-theme="light"] [style*="background: rgb(34, 38, 52)"],
+[data-theme="light"] [style*="background: rgb(35, 39, 51)"],
+[data-theme="light"] [style*="background: rgb(38, 43, 58)"],
+[data-theme="light"] [style*="background: rgb(42, 42, 42)"],
+[data-theme="light"] [style*="background: rgb(43, 48, 64)"],
+[data-theme="light"] [style*="background: rgb(44, 50, 68)"],
+[data-theme="light"] [style*="background: rgb(46, 52, 64)"],
+[data-theme="light"] [style*="background: rgb(46, 52, 72)"],
+[data-theme="light"] [style*="background: rgb(51, 51, 51)"],
+[data-theme="light"] [style*="background: rgb(51, 65, 85)"] {
+  background-color: var(--surface-3) !important;
+  background: var(--surface-3) !important;
 }
 
-/* Hard-coded white text (color: #fff / #ffffff / white) – reset to theme primary */
-[data-theme="light"] [style*="color: #fff;"],
-[data-theme="light"] [style*="color: #ffffff;"],
-[data-theme="light"] [style*="color: white;"],
-[data-theme="light"] [style*="color: rgb(255, 255, 255);"] {
+/* ── Dark rgba backgrounds → surface-0/1 ── */
+[data-theme="light"] [style*="background: rgba(2,4,8,"],
+[data-theme="light"] [style*="background: rgba(2,6,12,"],
+[data-theme="light"] [style*="background: rgba(5,5,5,"],
+[data-theme="light"] [style*="background: rgba(5,10,16,"],
+[data-theme="light"] [style*="background: rgba(5,10,15,"],
+[data-theme="light"] [style*="background: rgba(5, 10, 15,"],
+[data-theme="light"] [style*="background: rgba(5, 10, 18,"],
+[data-theme="light"] [style*="background: rgba(10,15,22,"],
+[data-theme="light"] [style*="background: rgba(10, 5, 25,"],
+[data-theme="light"] [style*="background: rgba(11,16,22,"],
+[data-theme="light"] [style*="background: rgba(15,5,30,"],
+[data-theme="light"] [style*="background: rgba(15, 23, 42,"],
+[data-theme="light"] [style*="background: rgba(15,23,42,"],
+[data-theme="light"] [style*="background: rgba(0,0,0,0.75)"],
+[data-theme="light"] [style*="background: rgba(0,0,0,0.8"],
+[data-theme="light"] [style*="background: rgba(0,0,0,0.9"] {
+  background-color: var(--surface-1) !important;
+  background: var(--surface-1) !important;
+}
+
+/* ── Low-opacity white backgrounds → subtle theme tint ── */
+[data-theme="light"] [style*="background: rgba(255,255,255,0.02)"],
+[data-theme="light"] [style*="background: rgba(255,255,255,0.03)"] {
+  background: var(--surface-2) !important;
+}
+
+/* ── Dark gradient overlays → theme surface gradients ── */
+[data-theme="light"] [style*="background: linear-gradient(0deg, rgba(2,4,8,"],
+[data-theme="light"] [style*="background: linear-gradient(180deg, rgba(2,4,8,"],
+[data-theme="light"] [style*="background: linear-gradient(180deg, rgba(0,0,0,"] {
+  background: linear-gradient(0deg, var(--surface-0) 60%, var(--surface-1) 100%) !important;
+}
+
+/* ─── LIGHT MODE: Border overrides ───────────────────────────────── */
+[data-theme="light"] [style*="border: 1px solid #222634"],
+[data-theme="light"] [style*="border: 1px solid #232733"],
+[data-theme="light"] [style*="border: 1px solid #262b3a"],
+[data-theme="light"] [style*="border: 1px solid #2b3040"],
+[data-theme="light"] [style*="border: 1px solid #2c3244"],
+[data-theme="light"] [style*="border: 1px solid #2e3440"],
+[data-theme="light"] [style*="border: 1px solid #2e3448"],
+[data-theme="light"] [style*="border: 1px solid #334155"],
+[data-theme="light"] [style*="border: 1.5px solid #222"],
+[data-theme="light"] [style*="border: 1px solid #222"],
+[data-theme="light"] [style*="border: 1px solid rgb(34, 38, 52)"],
+[data-theme="light"] [style*="border: 1px solid rgb(35, 39, 51)"],
+[data-theme="light"] [style*="border: 1px solid rgb(38, 43, 58)"],
+[data-theme="light"] [style*="border: 1px solid rgb(43, 48, 64)"],
+[data-theme="light"] [style*="border: 1px solid rgb(44, 50, 68)"],
+[data-theme="light"] [style*="border: 1px solid rgb(46, 52, 64)"],
+[data-theme="light"] [style*="border: 1px solid rgb(46, 52, 72)"],
+[data-theme="light"] [style*="border: 1px solid rgb(51, 65, 85)"],
+[data-theme="light"] [style*="border: 1.5px solid rgb(34, 34, 34)"],
+[data-theme="light"] [style*="border: 1px solid rgb(34, 34, 34)"] {
+  border-color: var(--border) !important;
+}
+
+/* ─── LIGHT MODE: Text color overrides ───────────────────────────── */
+/* White text → theme primary */
+[data-theme="light"] [style*="color: #fff"],
+[data-theme="light"] [style*="color: #ffffff"],
+[data-theme="light"] [style*="color: white"],
+[data-theme="light"] [style*="color: rgb(255, 255, 255)"],
+[data-theme="light"] [style*="color: #f8fafc"],
+[data-theme="light"] [style*="color: #e2e8f0"],
+[data-theme="light"] [style*="color: #c9d1d9"],
+[data-theme="light"] [style*="color: #cbd5e1"],
+[data-theme="light"] [style*="color: rgb(248, 250, 252)"],
+[data-theme="light"] [style*="color: rgb(226, 232, 240)"],
+[data-theme="light"] [style*="color: rgb(201, 209, 217)"],
+[data-theme="light"] [style*="color: rgb(203, 213, 225)"] {
   color: var(--text-primary) !important;
 }
 
-/* Hard-coded dark terminal / code surfaces – keep them dark even in light mode for readability */
+/* Light gray text → theme secondary */
+[data-theme="light"] [style*="color: #94a3b8"],
+[data-theme="light"] [style*="color: #8b949e"],
+[data-theme="light"] [style*="color: #6b7280"],
+[data-theme="light"] [style*="color: #64748b"],
+[data-theme="light"] [style*="color: #666"],
+[data-theme="light"] [style*="color: #555"],
+[data-theme="light"] [style*="color: #334155"],
+[data-theme="light"] [style*="color: rgb(148, 163, 184)"],
+[data-theme="light"] [style*="color: rgb(139, 148, 158)"],
+[data-theme="light"] [style*="color: rgb(107, 114, 128)"],
+[data-theme="light"] [style*="color: rgb(100, 116, 139)"],
+[data-theme="light"] [style*="color: rgb(102, 102, 102)"],
+[data-theme="light"] [style*="color: rgb(85, 85, 85)"],
+[data-theme="light"] [style*="color: rgb(51, 65, 85)"] {
+  color: var(--text-secondary) !important;
+}
+
+/* ─── LIGHT MODE: Box-shadow overrides ───────────────────────────── */
+[data-theme="light"] [style*="box-shadow"] {
+  --tw-shadow-color: rgba(0, 0, 0, 0.08);
+}
+
+/* ─── LIGHT MODE: SVG / icon overrides for inline white strokes ──── */
+[data-theme="light"] [style*="color: rgba(255,255,255,0."] {
+  color: var(--text-muted) !important;
+}
+
+/* ─── LIGHT MODE: Dashed border overrides ────────────────────────── */
+[data-theme="light"] [style*="border: 1px dashed rgba(255,255,255,"] {
+  border-color: var(--border) !important;
+}
+
+/* ─── Keep dark for actual terminal/code surfaces ────────────────── */
 [data-theme="light"] pre,
-[data-theme="light"] .terminal-log,
-[data-theme="light"] [style*="fontFamily: 'JetBrains Mono'"],
-[data-theme="light"] [style*="font-family: 'JetBrains Mono'"],
-[data-theme="light"] [style*="fontFamily: monospace"] {
+[data-theme="light"] .terminal-log {
   background: #1a1d23 !important;
   color: #e2e8f0 !important;
 }
+
 

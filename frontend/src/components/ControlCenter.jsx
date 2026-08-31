@@ -2322,7 +2322,7 @@ function CoolantFlowDiagram({ powerTelemetry, visible }) {
 /* ═══════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════ */
-function ControlCenter() {
+function ControlCenter({ theme = 'light' }) {
   const [data, setData] = useState(null)
   const [isConnected, setIsConnected] = useState(false)
   const [datasets, setDatasets] = useState([])
@@ -2341,7 +2341,7 @@ function ControlCenter() {
   const [genActive, setGenActive] = useState(false)
   const [batteryCharging, setBatteryCharging] = useState(true)
   const [showThermal, setShowThermal] = useState(false)
-  const [isDarkMode, setIsDarkMode] = useState(true)
+  const isDarkMode = false
 
   const [logEntries, setLogEntries] = useState([
     { time: new Date().toLocaleTimeString(), msg: 'Control Center initialized. All systems nominal.', level: 'info' },
@@ -2693,27 +2693,7 @@ function ControlCenter() {
                 {showThermal ? <Eye size={10} /> : <EyeOff size={10} />}
                 THERMAL {showThermal ? 'ON' : 'OFF'}
               </button>
-              {/* Light / Dark Mode Toggle */}
-              <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className="cc-panel-hover"
-                style={{
-                  background: isDarkMode ? 'rgba(234,179,8,0.15)' : 'rgba(15,23,42,0.10)',
-                  border: `1px solid ${isDarkMode ? 'rgba(234,179,8,0.3)' : 'rgba(15,23,42,0.25)'}`,
-                  color: isDarkMode ? '#eab308' : '#0f172a',
-                  borderRadius: '3px',
-                  padding: '2px 8px',
-                  fontSize: '0.55rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                {isDarkMode ? <Sun size={10} /> : <Moon size={10} />}
-                {isDarkMode ? 'LIGHT MODE' : 'DARK MODE'}
-              </button>
+
               {genActive && (
                 <span style={{
                   fontSize: '0.55rem', padding: '1px 6px', borderRadius: '3px',

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Monitor, Video, Cpu, Activity, AlertTriangle } from 'lucide-react'
 
-function GraphicsViewer() {
+function GraphicsViewer({ theme = 'light' }) {
   const canvasRef = useRef(null)
   const [selectedVGPU, setSelectedVGPU] = useState(null)
   const [stressMode, setStressMode] = useState(false)
@@ -59,7 +59,7 @@ function GraphicsViewer() {
     }, 1000)
 
     if (selectedVGPU && canvasRef.current) {
-      const ws = new WebSocket(`ws://localhost:8000/ws/render/${selectedVGPU}?stress=${stressMode ? 'true' : 'false'}`)
+      const ws = new WebSocket(`ws://localhost:8000/ws/render/${selectedVGPU}?stress=${stressMode ? 'true' : 'false'}&theme=${theme}`)
       wsRef.current = ws
 
       ws.onmessage = (event) => {
@@ -68,7 +68,7 @@ function GraphicsViewer() {
           const canvas = canvasRef.current
           if (canvas) {
             const ctx = canvas.getContext('2d')
-            ctx.fillStyle = '#050505'
+            ctx.fillStyle = theme === 'light' ? '#ffffff' : '#050505'
             ctx.fillRect(0, 0, canvas.width, canvas.height)
             ctx.font = '14px monospace'
             ctx.fillStyle = 'var(--red)'
@@ -98,14 +98,14 @@ function GraphicsViewer() {
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
             
             // Draw nice glowing target identifier directly on canvas corner
-            ctx.fillStyle = 'rgba(0,0,0,0.7)'
+            ctx.fillStyle = theme === 'light' ? 'rgba(240,242,245,0.9)' : 'rgba(0,0,0,0.7)'
             ctx.fillRect(10, 10, 240, 32)
             ctx.strokeStyle = stressMode ? '#ef4444' : 'var(--accent)'
             ctx.lineWidth = 1
             ctx.strokeRect(10, 10, 240, 32)
             
             ctx.font = 'bold 9px JetBrains Mono, monospace'
-            ctx.fillStyle = stressMode ? '#f87171' : 'var(--accent)'
+            ctx.fillStyle = stressMode ? (theme === 'light' ? '#b91c1c' : '#f87171') : (theme === 'light' ? '#4f8a10' : 'var(--accent)')
             ctx.fillText(
               `TARGET: vGPU-${selectedVGPU.substring(0,8).toUpperCase()} | ${stressMode ? 'STRESS ACTIVE' : 'NOMINAL'}`, 
               18, 
@@ -123,7 +123,7 @@ function GraphicsViewer() {
     } else {
       clearInterval(statsInterval)
     }
-  }, [selectedVGPU, stressMode, computePct])
+  }, [selectedVGPU, stressMode, computePct, theme])
 
   return (
     <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem', background: 'var(--black)', minHeight: '100%' }}>
@@ -167,9 +167,9 @@ function GraphicsViewer() {
                   width: '100%', 
                   maxWidth: '320px',
                   padding: '0.6rem 0.75rem', 
-                  background: '#000', 
+                  background: 'var(--select-bg)', 
                   border: '1px solid var(--border)', 
-                  color: '#fff', 
+                  color: 'var(--text-primary)', 
                   outline: 'none', 
                   borderRadius: '4px',
                   fontSize: '0.85rem'
@@ -231,7 +231,7 @@ function GraphicsViewer() {
             </h3>
 
             <div style={{ 
-              background: '#020202', 
+              background: 'var(--surface-0)', 
               border: '1px solid var(--border)', 
               borderRadius: '8px', 
               display: 'flex', 

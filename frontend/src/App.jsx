@@ -12,11 +12,12 @@ import ComputeComparison from './components/ComputeComparison'
 import Logs from './components/Logs'
 import AIComparisonAgent from './components/AIComparisonAgent'
 import ProjectAIChatbot from './components/ProjectAIChatbot'
+import VirtualizationTopology from './components/VirtualizationTopology'
 import {
   LayoutDashboard, Server, Box, GitCompare,
   Image as ImageIcon, FileText, Settings,
   HelpCircle, Bell, Search, Cpu as CpuIcon, Activity, Network, Droplet,
-  Sun, Moon, Monitor, Bot
+  Sun, Moon, Monitor, Bot, Layers
 } from 'lucide-react'
 
 const queryClient = new QueryClient()
@@ -24,7 +25,7 @@ const queryClient = new QueryClient()
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
 
-  //  Theme State 
+  //  Theme State — default to dark mode
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('vgpu-theme') || 'dark'
   })
@@ -45,23 +46,30 @@ function App() {
   //  Navigation Tabs 
   const tabs = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, component: Dashboard },
+    { id: 'vgpu', name: 'vGPU Manager', icon: Server, component: VGPUManager },
     { id: 'project_chatbot', name: 'Project AI Assistant', icon: Bot, component: ProjectAIChatbot },
     { id: 'gpu_monitor', name: 'GPU Monitor', icon: Activity, component: GPUMonitor },
     { id: 'ai_data_center', name: 'AI Data Center', icon: Network, component: AIDataCenter },
     { id: 'control_center', name: 'Control Center', icon: Monitor, component: ControlCenter },
     { id: 'water_resource', name: 'Water & Resource', icon: Droplet, component: WaterComputePlanner },
     { id: 'comparison', name: 'Speed Comparison', icon: GitCompare, component: ComputeComparison },
-    { id: 'vgpu', name: 'vGPU Manager', icon: Server, component: VGPUManager },
     { id: 'vm_inspector', name: 'VM Inspector', icon: Box, component: VMInspector },
     { id: 'graphics', name: 'Graphics Viewer', icon: ImageIcon, component: GraphicsViewer },
     { id: 'logs', name: 'Logs', icon: FileText, component: Logs },
+    { id: 'topology', name: 'Virtualization Architecture', icon: Layers, component: VirtualizationTopology },
   ]
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div style={{ display: 'flex', height: '100vh', background: 'var(--black)', color: 'var(--text-primary)', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', height: '100vh', background: 'var(--black)', color: 'var(--text-primary)', overflow: 'hidden', position: 'relative' }}>
+        {/* Liquid Glass Background Blobs */}
+        <div className="liquid-blob-container">
+          <div className="liquid-blob blob-purple"></div>
+          <div className="liquid-blob blob-blue"></div>
+          <div className="liquid-blob blob-pink"></div>
+        </div>
 
         {/*  Left Sidebar  */}
         <aside style={{
@@ -71,6 +79,8 @@ function App() {
           display: 'flex',
           flexDirection: 'column',
           flexShrink: 0,
+          position: 'relative',
+          zIndex: 2,
         }}>
           {/* Logo */}
           <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: '1px solid var(--border)' }}>
@@ -198,7 +208,7 @@ function App() {
         </aside>
 
         {/*  Main Content Area  */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 2 }}>
 
           {/* Top Header */}
           <header style={{
@@ -283,7 +293,7 @@ function App() {
 
           {/* Page Content */}
           <main style={{ flex: 1, overflowY: 'auto', background: 'var(--black)' }}>
-            {ActiveComponent && <ActiveComponent />}
+            {ActiveComponent && <ActiveComponent theme={theme} />}
           </main>
           <AIComparisonAgent activeTab={activeTab} setActiveTab={setActiveTab} />
         </div>

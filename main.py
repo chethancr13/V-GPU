@@ -99,25 +99,7 @@ async def startup_event():
     except Exception as e:
         print(f" [Startup] Warning: Failed to auto-provision default vGPU nodes: {e}")
 
-    # Auto-open the Hypervisor & Slicing monitor window in the default browser
-    async def open_monitor_window():
-        try:
-            await asyncio.sleep(2.0)  # let the server finish binding before the websocket connects
-            monitor_url = os.path.abspath("hypervisor_slicing.html")
-            if os.path.exists(monitor_url):
-                if sys.platform == "win32":
-                    os.startfile(monitor_url)  # type: ignore[attr-defined]
-                elif sys.platform == "darwin":
-                    subprocess.Popen(["open", monitor_url])
-                else:
-                    subprocess.Popen(["xdg-open", monitor_url])
-                print(" [Startup] Opened Hypervisor & Slicing monitor window.")
-            else:
-                print(" [Startup] hypervisor_slicing.html not found; skipping auto-open.")
-        except Exception as e:
-            print(f" [Startup] Warning: Failed to open monitor window: {e}")
 
-    asyncio.create_task(open_monitor_window())
 
 # Global state for tracking ML jobs & scheduling
 recent_jobs = []
@@ -1087,11 +1069,20 @@ async def ws_render(websocket: WebSocket, vgpu_id: str):
     angle = 0
     try:
         while True:
-            # Check stress query parameter
+            # Check stress and theme query parameters
             is_stress = websocket.query_params.get("stress") == "true"
+            theme = websocket.query_params.get("theme", "dark")
+            is_light = theme == "light"
             
-            # Create dark themed rendering frame
-            img = Image.new("RGB", (720, 400), "#050505")
+            bg_color = "#ffffff" if is_light else "#050505"
+            grid_color = "#f0f2f5" if is_light else "#111111"
+            border_color = "#cbd5e1" if is_light else "#1e293b"
+            text_color = "#64748b" if is_light else "#475569"
+            cross_color = "#fee2e2" if is_light else "#3a1215"
+            warning_text_color = "#ef4444" if is_light else "#4f2023"
+            
+            # Create rendering frame with theme-appropriate background
+            img = Image.new("RGB", (720, 400), bg_color)
             draw = ImageDraw.Draw(img)
             
             if is_stress:
@@ -1103,17 +1094,17 @@ async def ws_render(websocket: WebSocket, vgpu_id: str):
                     allowed_channels = 4
                 elif compute_pct < 90:
                     allowed_channels = 6
-
+ 
                 # Memory capacity constraints
                 if vram_mb < 1500:
                     allowed_channels = min(allowed_channels, 2)
                 elif vram_mb < 3000:
                     allowed_channels = min(allowed_channels, 4)
-
+ 
                 # Draw 8 viewports arranged in a 4x2 grid
                 shape_types = ["cube", "pyramid", "octahedron", "cylinder", "cone", "star", "ring", "wave"]
                 for row in range(2):
-                    for col in range(4):
+                  for col in range(4):
                         idx = row * 4 + col
                         cx = col * 180 + 90
                         cy = row * 200 + 100
@@ -1122,12 +1113,12 @@ async def ws_render(websocket: WebSocket, vgpu_id: str):
                         # Draw grid sub-viewport border
                         draw.rectangle(
                             [col * 180, row * 200, (col + 1) * 180, (row + 1) * 200], 
-                            outline="#1e293b", 
+                            outline=border_color, 
                             width=1
                         )
                         
                         # Draw viewport identifiers (similar to surveillance feeds)
-                        draw.text((col * 180 + 8, row * 200 + 6), f"CORE-A0{idx+1}", fill="#475569")
+                        draw.text((col * 180 + 8, row * 200 + 6), f"CORE-A0{idx+1}", fill=text_color)
                         
                         if idx < allowed_channels:
                             draw.text((col * 180 + 120, row * 200 + 6), "ONLINE", fill="#76B900")
@@ -1136,9 +1127,9 @@ async def ws_render(websocket: WebSocket, vgpu_id: str):
                         else:
                             draw.text((col * 180 + 120, row * 200 + 6), "MUTED", fill="#f85149")
                             # Draw a red warning cross inside the locked viewport
-                            draw.line([(col * 180 + 20, row * 200 + 45), ((col + 1) * 180 - 20, (row + 1) * 200 - 25)], fill="#3a1215", width=1)
-                            draw.line([((col + 1) * 180 - 20, row * 200 + 45), (col * 180 + 20, (row + 1) * 200 - 25)], fill="#3a1215", width=1)
-                            draw.text((col * 180 + 45, row * 200 + 95), "RESOURCE LIMIT", fill="#4f2023")
+                            draw.line([(col * 180 + 20, row * 200 + 45), ((col + 1) * 180 - 20, (row + 1) * 200 - 25)], fill=cross_color, width=1)
+                            draw.line([((col + 1) * 180 - 20, row * 200 + 45), (col * 180 + 20, (row + 1) * 200 - 25)], fill=cross_color, width=1)
+                            draw.text((col * 180 + 45, row * 200 + 95), "RESOURCE LIMIT", fill=warning_text_color)
                 
                 # Dynamic compute lag factor
                 lag_factor = 1.0
@@ -1158,9 +1149,9 @@ async def ws_render(websocket: WebSocket, vgpu_id: str):
             else:
                 # Single large 3D sphere render mode
                 for i in range(0, 720, 40):
-                    draw.line([(i, 0), (i, 400)], fill="#111111", width=1)
+                    draw.line([(i, 0), (i, 400)], fill=grid_color, width=1)
                 for j in range(0, 400, 40):
-                    draw.line([(0, j), (720, j)], fill="#111111", width=1)
+                    draw.line([(0, j), (720, j)], fill=grid_color, width=1)
                     
                 rad_y = math.radians(angle)
                 rad_x = math.radians(angle * 0.5)
