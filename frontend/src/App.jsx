@@ -49,7 +49,7 @@ function App() {
     { id: 'vgpu', name: 'vGPU Manager', icon: Server, component: VGPUManager },
     { id: 'project_chatbot', name: 'Project AI Assistant', icon: Bot, component: ProjectAIChatbot },
     { id: 'gpu_monitor', name: 'GPU Monitor', icon: Activity, component: GPUMonitor },
-    { id: 'ai_data_center', name: 'AI Data Center', icon: Network, component: AIDataCenter },
+    { id: 'ai_data_center', name: 'AI Power Supply', icon: Network, component: AIDataCenter },
     { id: 'control_center', name: 'Control Center', icon: Monitor, component: ControlCenter },
     { id: 'water_resource', name: 'Water & Resource', icon: Droplet, component: WaterComputePlanner },
     { id: 'comparison', name: 'Speed Comparison', icon: GitCompare, component: ComputeComparison },

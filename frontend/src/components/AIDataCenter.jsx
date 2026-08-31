@@ -229,25 +229,33 @@ function AIDataCenter() {
   const coolingPower = (avgTemp * 4.2) + (cracPumpHigh ? 160 : 75) + (customCracCount * 45) + powerTel.chillerFlow * 0.3
   const totalSitePower = itDcLoad + itAcLoad + coolingPower
 
-  const spacingX = 35
-  const spacingY = 17.5
-  const cabinetHeight = 55
-  const centerX = 440
-  const centerY = 140
+  const handleInspect = (id) => {
+    let targetId = id;
+    if (id.startsWith('custom-')) {
+      const index = parseInt(id.split('-')[1]);
+      const customServers = serversList.filter(s => s.id.startsWith('rack-custom-'));
+      if (customServers[index]) {
+        targetId = customServers[index].id;
+      } else {
+        setIsProvisioning(true);
+        return;
+      }
+    }
+    const found = serversList.find(s => s.id === targetId);
+    if (found) {
+      setActiveTab(found);
+    }
+  };
 
-  const getIsoCoordinates = (x, y) => {
-    const theta = rotationAngle * Math.PI / 180
-    const dx = x - 3.5
-    const dy = y - 3.5
-    const rx = dx * Math.cos(theta) - dy * Math.sin(theta)
-    const ry = dx * Math.sin(theta) + dy * Math.cos(theta)
-    return { x: (rx - ry) * spacingX + centerX, y: (rx + ry) * spacingY + centerY }
-  }
-
-  const getBoxVertices = (x, y) => {
-    const corners = [getIsoCoordinates(x, y), getIsoCoordinates(x + 1, y), getIsoCoordinates(x + 1, y + 1), getIsoCoordinates(x, y + 1)]
-    return { vL: corners.reduce((min, p) => p.x < min.x ? p : min, corners[0]), vR: corners.reduce((max, p) => p.x > max.x ? p : max, corners[0]), vT: corners.reduce((min, p) => p.y < min.y ? p : min, corners[0]), vB: corners.reduce((max, p) => p.y > max.y ? p : max, corners[0]) }
-  }
+  const isInspected = (id) => {
+    if (!activeTab) return false;
+    if (id.startsWith('custom-')) {
+      const index = parseInt(id.split('-')[1]);
+      const customServers = serversList.filter(s => s.id.startsWith('rack-custom-'));
+      return activeTab.id === customServers[index]?.id;
+    }
+    return activeTab.id === id;
+  };
 
   const inspected = activeTab ? (serversList.find(s => s.id === activeTab.id) || null) : null
   const gpuId = inspected?.type === 'gpu' ? inspected.gpuId : null
@@ -264,12 +272,276 @@ function AIDataCenter() {
   const isGpuStressed = gpuId !== null ? gpuStressStates[gpuId] : false
   const childVgpus = gpuId !== null && !isCustomGpu && data?.vgpu_instances ? data.vgpu_instances.filter(v => v.physical_gpu_id === gpuId) : []
 
-  const sortedTiles = []
-  for (let x = 0; x < 8; x++) { for (let y = 0; y < 8; y++) { sortedTiles.push({ x, y, depthY: getIsoCoordinates(x, y).y }) } }
-  sortedTiles.sort((a, b) => a.depthY - b.depthY)
+  // Helper to render a light silver/white server rack
+  const renderDataCenterServerRack = (rx, ry, id) => {
+    const h = 28;
+    const w = 7;
+    const d = 11;
+    
+    const t1 = { x: rx, y: ry - h }
+    const t2 = { x: rx - w, y: ry - h + w*0.5 }
+    const t3 = { x: rx - w + d, y: ry - h + w*0.5 + d*0.5 }
+    const t4 = { x: rx + d, y: ry - h + d*0.5 }
+    
+    const b2 = { x: rx - w, y: ry + w*0.5 }
+    const b3 = { x: rx - w + d, y: ry + w*0.5 + d*0.5 }
+    const b4 = { x: rx + d, y: ry + d*0.5 }
+    
+    const active = isInspected(id);
+    
+    return (
+      <g 
+        key={`rack-${id}`}
+        onClick={() => handleInspect(id)}
+        style={{ cursor: 'pointer' }}
+        filter={active ? 'url(#glow)' : ''}
+      >
+        <polygon points={`${rx},${ry} ${rx-w},${ry+w*0.5} ${rx-w+d},${ry+w*0.5+d*0.5} ${rx+d},${ry+d*0.5}`} fill="black" opacity="0.25" />
+        <polygon points={`${t2.x},${t2.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b2.x},${b2.y}`} fill={active ? '#06b6d4' : '#94a3b8'} stroke={active ? '#00f2fe' : '#64748b'} strokeWidth="0.5" />
+        <polygon points={`${t4.x},${t4.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b4.x},${b4.y}`} fill={active ? '#22d3ee' : '#cbd5e1'} stroke={active ? '#00f2fe' : '#64748b'} strokeWidth="0.5" />
+        <polygon points={`${t1.x},${t1.y} ${t2.x},${t2.y} ${t3.x},${t3.y} ${t4.x},${t4.y}`} fill={active ? '#e0f2fe' : '#f1f5f9'} stroke={active ? '#00f2fe' : '#cbd5e1'} strokeWidth="0.5" />
+        
+        {Array.from({ length: 5 }).map((_, idx) => {
+          const ly = t4.y + (idx + 1) * (h / 6);
+          const lx1 = t4.x - (t4.x - t3.x) * 0.15;
+          const lx2 = t4.x - (t4.x - t3.x) * 0.85;
+          return (
+            <line
+              key={idx}
+              x1={lx1}
+              y1={ly - idx * 0.4 + 1}
+              x2={lx2}
+              y2={ly - idx * 0.4 + 3}
+              stroke={active ? '#083344' : '#475569'}
+              strokeWidth="0.8"
+            />
+          )
+        })}
+      </g>
+    )
+  }
 
-  const sortedCabinets = serversList.map(o => ({ ...o, depthY: getIsoCoordinates(o.x, o.y).y }))
-  sortedCabinets.sort((a, b) => a.depthY - b.depthY)
+  // Helper to render cooling system air handlers
+  const renderCoolingCabinet = (cx, cy, id) => {
+    const h = 45;
+    const w = 11;
+    const d = 15;
+    
+    const t1 = { x: cx, y: cy - h }
+    const t2 = { x: cx - w, y: cy - h + w*0.5 }
+    const t3 = { x: cx - w + d, y: cy - h + w*0.5 + d*0.5 }
+    const t4 = { x: cx + d, y: cy - h + d*0.5 }
+    
+    const b2 = { x: cx - w, y: cy + w*0.5 }
+    const b3 = { x: cx - w + d, y: cy + w*0.5 + d*0.5 }
+    const b4 = { x: cx + d, y: cy + d*0.5 }
+    
+    const active = isInspected(id);
+    
+    return (
+      <g 
+        key={`cab-${id}`}
+        onClick={() => handleInspect(id)}
+        style={{ cursor: 'pointer' }}
+        filter={active ? 'url(#glow)' : ''}
+      >
+        <polygon points={`${cx},${cy} ${cx-w},${cy+w*0.5} ${cx-w+d},${cy+w*0.5+d*0.5} ${cx+d},${cy+d*0.5}`} fill="black" opacity="0.2" />
+        <polygon points={`${t2.x},${t2.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b2.x},${b2.y}`} fill={active ? '#0e7490' : '#7f97c7'} stroke={active ? '#06b6d4' : '#5d729e'} strokeWidth="0.5" />
+        <polygon points={`${t4.x},${t4.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b4.x},${b4.y}`} fill={active ? '#06b6d4' : '#b4c6e7'} stroke={active ? '#06b6d4' : '#5d729e'} strokeWidth="0.5" />
+        <polygon points={`${t1.x},${t1.y} ${t2.x},${t2.y} ${t3.x},${t3.y} ${t4.x},${t4.y}`} fill={active ? '#cffafe' : '#d9e1f2'} stroke={active ? '#06b6d4' : '#b4c6e7'} strokeWidth="0.5" />
+      </g>
+    )
+  }
+
+  // Helper to render water cooling towers with active fan spinners
+  const renderAIWaterCoolingTower = (tx, ty, id) => {
+    const h = 42;
+    const w = 24;
+    const d = 26;
+    
+    const t1 = { x: tx, y: ty - h }
+    const t2 = { x: tx - w, y: ty - h + w*0.5 }
+    const t3 = { x: tx - w + d, y: ty - h + w*0.5 + d*0.5 }
+    const t4 = { x: tx + d, y: ty - h + d*0.5 }
+    
+    const b2 = { x: tx - w, y: ty + w*0.5 }
+    const b3 = { x: tx - w + d, y: ty + w*0.5 + d*0.5 }
+    const b4 = { x: tx + d, y: ty + d*0.5 }
+    
+    const fc = { x: (t1.x + t3.x)/2, y: (t1.y + t3.y)/2 }
+    
+    const active = isInspected('rack-chiller');
+    
+    return (
+      <g 
+        key={`cooltower-${id}`}
+        onClick={() => handleInspect('rack-chiller')}
+        style={{ cursor: 'pointer' }}
+        filter={active ? 'url(#glow)' : ''}
+      >
+        <polygon points={`${tx},${ty} ${tx-w},${ty+w*0.5} ${tx-w+d},${ty+w*0.5+d*0.5} ${tx+d},${ty+d*0.5}`} fill="black" opacity="0.25" />
+        <polygon points={`${t2.x},${t2.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b2.x},${b2.y}`} fill={active ? '#155e75' : '#29505a'} stroke={active ? '#22d3ee' : '#1c373e'} strokeWidth="0.8" />
+        <polygon points={`${t4.x},${t4.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b4.x},${b4.y}`} fill={active ? '#06b6d4' : '#3f7685'} stroke={active ? '#22d3ee' : '#1c373e'} strokeWidth="0.8" />
+        <polygon points={`${t1.x},${t1.y} ${t2.x},${t2.y} ${t3.x},${t3.y} ${t4.x},${t4.y}`} fill={active ? '#e0f2fe' : '#64a5b5'} stroke={active ? '#22d3ee' : '#3f7685'} strokeWidth="0.8" />
+        
+        {Array.from({ length: 4 }).map((_, idx) => {
+          const ly = t4.y + (idx + 1) * (h / 5);
+          const lx1 = t4.x - (t4.x - t3.x) * 0.15;
+          const lx2 = t4.x - (t4.x - t3.x) * 0.85;
+          return (
+            <line
+              key={idx}
+              x1={lx1}
+              y1={ly - idx * 0.4 + 1}
+              x2={lx2}
+              y2={ly - idx * 0.4 + 3}
+              stroke={active ? '#083344' : '#132a30'}
+              strokeWidth="1.5"
+            />
+          )
+        })}
+
+        <ellipse cx={fc.x} cy={fc.y} rx="16" ry="8" fill="#132a30" stroke="#0b1b1f" strokeWidth="1" />
+        
+        <g transform={`translate(${fc.x}, ${fc.y}) scale(1, 0.5)`}>
+          <g className="fan-spinner" style={{ animationDuration: avgTemp > 50 ? '0.3s' : '0.65s' }}>
+            <line x1="-12" y1="0" x2="12" y2="0" stroke="#94a3b8" strokeWidth="2.5" />
+            <line x1="0" y1="-12" x2="0" y2="12" stroke="#94a3b8" strokeWidth="2.5" />
+            <line x1="-8.5" y1="-8.5" x2="8.5" y2="8.5" stroke="#94a3b8" strokeWidth="2" />
+            <line x1="8.5" y1="-8.5" x2="-8.5" y2="8.5" stroke="#94a3b8" strokeWidth="2" />
+            <circle cx="0" cy="0" r="3" fill="#cbd5e1" />
+          </g>
+        </g>
+
+        <path d={`M ${fc.x - 6} ${fc.y - 12} Q ${fc.x - 10} ${fc.y - 25} ${fc.x - 5} ${fc.y - 35}`} className="wind-wave" style={{ animationDelay: '0s' }} />
+        <path d={`M ${fc.x + 6} ${fc.y - 10} Q ${fc.x + 2} ${fc.y - 22} ${fc.x + 8} ${fc.y - 32}`} className="wind-wave" style={{ animationDelay: '0.8s' }} />
+      </g>
+    )
+  }
+
+  // Helper to render UPS battery racks (blue/red)
+  const renderUPSRack = (ux, uy, isRed, id) => {
+    const h = 34;
+    const w = 9;
+    const d = 13;
+    
+    const t1 = { x: ux, y: uy - h }
+    const t2 = { x: ux - w, y: uy - h + w*0.5 }
+    const t3 = { x: ux - w + d, y: uy - h + w*0.5 + d*0.5 }
+    const t4 = { x: ux + d, y: uy - h + d*0.5 }
+    
+    const b2 = { x: ux - w, y: uy + w*0.5 }
+    const b3 = { x: ux - w + d, y: uy + w*0.5 + d*0.5 }
+    const b4 = { x: ux + d, y: uy + d*0.5 }
+    
+    const active = isInspected('rack-ups');
+    const sideColor = isRed ? '#991b1b' : '#1e3a8a';
+    const frontColor = isRed ? '#ef4444' : '#3b82f6';
+    const strokeColor = active ? '#f59e0b' : (isRed ? '#7f1d1d' : '#1d4ed8');
+    
+    return (
+      <g 
+        key={`ups-${id}`}
+        onClick={() => handleInspect('rack-ups')}
+        style={{ cursor: 'pointer' }}
+        filter={active ? 'url(#glow)' : ''}
+      >
+        <polygon points={`${ux},${uy} ${ux-w},${uy+w*0.5} ${ux-w+d},${uy+w*0.5+d*0.5} ${ux+d},${uy+d*0.5}`} fill="black" opacity="0.2" />
+        <polygon points={`${t2.x},${t2.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b2.x},${b2.y}`} fill={sideColor} stroke={strokeColor} strokeWidth="0.5" />
+        <polygon points={`${t4.x},${t4.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b4.x},${b4.y}`} fill={frontColor} stroke={strokeColor} strokeWidth="0.5" />
+        <polygon points={`${t1.x},${t1.y} ${t2.x},${t2.y} ${t3.x},${t3.y} ${t4.x},${t4.y}`} fill="#e2e8f0" stroke={active ? '#f59e0b' : '#cbd5e1'} strokeWidth="0.5" />
+        
+        {/* Status LEDs on front face */}
+        <circle cx={t4.x - (t4.x-t3.x)*0.3} cy={t4.y + 6} r="1.5" fill="#22c55e" />
+        <circle cx={t4.x - (t4.x-t3.x)*0.6} cy={t4.y + 6} r="1.5" fill="#eab308" />
+      </g>
+    )
+  }
+
+  // Helper to render diesel generators with active fans and backup exhaust puffs
+  const renderDieselGenerator = (gx, gy, id) => {
+    const h = 38;
+    const w = 18;
+    const d = 30;
+    
+    const t1 = { x: gx, y: gy - h }
+    const t2 = { x: gx - w, y: gy - h + w*0.5 }
+    const t3 = { x: gx - w + d, y: gy - h + w*0.5 + d*0.5 }
+    const t4 = { x: gx + d, y: gy - h + d*0.5 }
+    
+    const b2 = { x: gx - w, y: gy + w*0.5 }
+    const b3 = { x: gx - w + d, y: gy + w*0.5 + d*0.5 }
+    const b4 = { x: gx + d, y: gy + d*0.5 }
+    
+    const active = isInspected('rack-generator');
+    const strokeColor = active ? '#f59e0b' : '#b45309';
+    
+    return (
+      <g 
+        key={`gen-${id}`}
+        onClick={() => handleInspect('rack-generator')}
+        style={{ cursor: 'pointer' }}
+        filter={active ? 'url(#glow)' : ''}
+      >
+        <polygon points={`${gx},${gy} ${gx-w},${gy+w*0.5} ${gx-w+d},${gy+w*0.5+d*0.5} ${gx+d},${gy+d*0.5}`} fill="black" opacity="0.3" />
+        <polygon points={`${t2.x},${t2.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b2.x},${b2.y}`} fill="#d97706" stroke={strokeColor} strokeWidth="0.8" />
+        <polygon points={`${t4.x},${t4.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b4.x},${b4.y}`} fill="#f59e0b" stroke={strokeColor} strokeWidth="0.8" />
+        <polygon points={`${t1.x},${t1.y} ${t2.x},${t2.y} ${t3.x},${t3.y} ${t4.x},${t4.y}`} fill="#fef08a" stroke={strokeColor} strokeWidth="0.8" />
+        
+        <line x1={t2.x + 5} y1={t2.y + w*0.5 + 4} x2={t2.x + 5} y2={b2.y + w*0.5 - 4} stroke={strokeColor} strokeWidth="2" />
+        <line x1={t2.x + 12} y1={t2.y + w*0.5 + 7} x2={t2.x + 12} y2={b2.y + w*0.5 - 1} stroke={strokeColor} strokeWidth="2" />
+        
+        <path d={`M ${t1.x + d*0.3} ${t1.y + d*0.15} L ${t1.x + d*0.3} ${t1.y - 12} L ${t1.x + d*0.3 + 8} ${t1.y - 16}`} fill="none" stroke="#64748b" strokeWidth="3" strokeLinecap="round" />
+        {genActive && (
+          <circle cx={t1.x + d*0.3 + 12} cy={t1.y - 18} r="4" fill="#64748b" opacity="0.6" className="wind-wave" />
+        )}
+
+        <g transform={`translate(${t3.x - 14}, ${t3.y - 12})`}>
+          <circle cx="0" cy="0" r="16" fill="#1e293b" stroke={strokeColor} strokeWidth="2" />
+          <circle cx="0" cy="0" r="14" fill="#0f172a" />
+          <g className="fan-spinner" style={{ animationDuration: genActive ? '0.2s' : '0.9s' }}>
+            <line x1="-12" y1="0" x2="12" y2="0" stroke="#94a3b8" strokeWidth="2.5" />
+            <line x1="0" y1="-12" x2="0" y2="12" stroke="#94a3b8" strokeWidth="2.5" />
+            <circle cx="0" cy="0" r="3.5" fill="#cbd5e1" />
+          </g>
+        </g>
+      </g>
+    )
+  }
+
+  // Helper to render white admin / control cabinets
+  const renderAdminCabinet = (ax, ay, id) => {
+    const h = 32;
+    const w = 12;
+    const d = 16;
+    
+    const t1 = { x: ax, y: ay - h }
+    const t2 = { x: ax - w, y: ay - h + w*0.5 }
+    const t3 = { x: ax - w + d, y: ay - h + w*0.5 + d*0.5 }
+    const t4 = { x: ax + d, y: ay - h + d*0.5 }
+    
+    const b2 = { x: ax - w, y: ay + w*0.5 }
+    const b3 = { x: ax - w + d, y: ay + w*0.5 + d*0.5 }
+    const b4 = { x: ax + d, y: ay + d*0.5 }
+    
+    const active = isInspected('rack-battery');
+    const strokeColor = active ? '#06b6d4' : '#cbd5e1';
+    
+    return (
+      <g 
+        key={`admin-${id}`}
+        onClick={() => handleInspect('rack-battery')}
+        style={{ cursor: 'pointer' }}
+        filter={active ? 'url(#glow)' : ''}
+      >
+        <polygon points={`${ax},${ay} ${ax-w},${ay+w*0.5} ${ax-w+d},${ay+w*0.5+d*0.5} ${ax+d},${ay+d*0.5}`} fill="black" opacity="0.25" />
+        <polygon points={`${t2.x},${t2.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b2.x},${b2.y}`} fill="#e2e8f0" stroke={strokeColor} strokeWidth="0.8" />
+        <polygon points={`${t4.x},${t4.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b4.x},${b4.y}`} fill="#cbd5e1" stroke={strokeColor} strokeWidth="0.8" />
+        <polygon points={`${t1.x},${t1.y} ${t2.x},${t2.y} ${t3.x},${t3.y} ${t4.x},${t4.y}`} fill="#f8fafc" stroke={strokeColor} strokeWidth="0.8" />
+        <line x1={t4.x - (t4.x-t3.x)*0.5} y1={t4.y + 4} x2={t4.x - (t4.x-t3.x)*0.5} y2={b4.y + 4} stroke={active ? '#06b6d4' : '#94a3b8'} strokeWidth="1" />
+      </g>
+    )
+  }
 
   return (
     <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', background: '#070b0e', minHeight: '100%', color: '#c9d1d9' }}>
@@ -277,27 +549,27 @@ function AIDataCenter() {
       <style>{`
         @keyframes dc-dash { to { stroke-dashoffset: -40; } }
         @keyframes flow-cool { 0% { stroke-dashoffset: 0; opacity: 0.1; } 50% { opacity: 0.8; } 100% { stroke-dashoffset: -50; opacity: 0.1; } }
+        @keyframes spin-fan { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes wind-wave-anim { 0% { transform: translateY(0) scaleX(0.8); opacity: 0; } 50% { opacity: 0.8; } 100% { transform: translateY(-22px) scaleX(1.15); opacity: 0; } }
         .animated-cable { stroke-dasharray: 6, 4; animation: dc-dash 1.5s linear infinite; }
         .cooling-flow { stroke-dasharray: 5, 10; animation: flow-cool 3s linear infinite; }
         .power-flow { stroke-dasharray: 8, 6; animation: dc-dash 2s linear infinite; }
         .water-flow { stroke-dasharray: 4, 8; animation: flow-cool 2.5s linear infinite; }
         .site-tab-active { border-bottom: 2px solid var(--accent); color: var(--text-primary); font-weight: 700; }
         .site-tab-inactive { color: var(--text-secondary); cursor: pointer; }
+        .fan-spinner { animation: spin-fan 0.65s linear infinite; transform-origin: 0px 0px; }
+        .wind-wave { animation: wind-wave-anim 1.8s ease-out infinite; stroke: #64a5b5; stroke-width: 1.2; fill: none; }
       `}</style>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.75rem' }}>
         <div>
-          <span style={{ fontSize: '0.65rem', color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.05em' }}>INFRASTRUCTURE CONTROL CENTER</span>
-          <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', margin: 0 }}>AI Data Center • Power • Backup • Water Cooling</h2>
+          <span style={{ fontSize: '0.65rem', color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.05em' }}>AI POWER SUPPLY & COOLING CONTROLS</span>
+          <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', margin: 0 }}>AI Power Supply • Grid • Substation • Cooling Systems</h2>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button onClick={() => setShowWiring(!showWiring)}
             style={{ padding: '0.35rem 0.75rem', background: showWiring ? 'rgba(118,185,0,0.15)' : 'var(--gray)', border: showWiring ? '1px solid var(--accent)' : '1px solid var(--border)', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', color: showWiring ? 'var(--accent)' : '#fff' }}>
             {showWiring ? 'HIDE WIRING' : 'SHOW WIRING'}
-          </button>
-          <button onClick={() => setViewMode(viewMode === '3D' ? 'PLAN' : '3D')}
-            style={{ padding: '0.35rem 0.75rem', background: 'var(--gray)', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', color: '#fff' }}>
-            VIEW: {viewMode}
           </button>
           <button onClick={() => setIsProvisioning(!isProvisioning)}
             style={{ padding: '0.35rem 0.75rem', background: isProvisioning ? 'rgba(118,185,0,0.2)' : 'var(--gray)', border: isProvisioning ? '1px solid var(--accent)' : '1px solid var(--border)', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', color: isProvisioning ? 'var(--accent)' : '#fff' }}>
@@ -306,258 +578,420 @@ function AIDataCenter() {
         </div>
       </div>
 
-      <div onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleMouseUp}
-        style={{ position: 'relative', width: '100%', height: '380px', background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden', cursor: dragStart ? 'grabbing' : 'grab', userSelect: 'none' }}>
+      {/* Layout Split: Left Visualizer, Right Telemetry & Controls */}
+      <div style={{ display: 'grid', gridTemplateColumns: '7.5fr 4.5fr', gap: '1.5rem', marginBottom: '1rem' }}>
         
-        <svg style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}>
-          
-          {sortedTiles.map(tile => {
-            const { x: isoX, y: isoY } = getIsoCoordinates(tile.x, tile.y)
-            return <polygon key={`tile-${tile.x}-${tile.y}`} points={`${isoX},${isoY} ${isoX + spacingX},${isoY + spacingY} ${isoX},${isoY + 2 * spacingY} ${isoX - spacingX},${isoY + spacingY}`} fill="#11161d" stroke="#1b222d" strokeWidth="0.8" />
-          })}
+        {/* Visualizer Area */}
+        <div 
+          style={{ 
+            position: 'relative', 
+            width: '100%', 
+            height: '450px', 
+            background: '#0e141a', 
+            border: '1px solid rgba(255,255,255,0.05)', 
+            borderRadius: '8px', 
+            overflow: 'hidden', 
+            userSelect: 'none' 
+          }}
+        >
+          <svg style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} viewBox="0 0 900 500">
+            <defs>
+              <filter id="shadow-blur" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="6" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              
+              <linearGradient id="pylonGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#475569" />
+                <stop offset="50%" stopColor="#94a3b8" />
+                <stop offset="100%" stopColor="#334155" />
+              </linearGradient>
 
-          {/* Wiring overlay */}
-          {showWiring && (
-            <>
-              {/* Power cables from PDUs to GPU hosts */}
-              <path d={`M ${getIsoCoordinates(0, 2).x + spacingX} ${getIsoCoordinates(0, 2).y + spacingY} L ${getIsoCoordinates(2, 2).x - spacingX} ${getIsoCoordinates(2, 2).y + spacingY}`} fill="none" stroke="#eab308" strokeWidth="2.5" className="power-flow" opacity={0.6} />
-              <path d={`M ${getIsoCoordinates(0, 5).x + spacingX} ${getIsoCoordinates(0, 5).y + spacingY} L ${getIsoCoordinates(5, 5).x - spacingX} ${getIsoCoordinates(5, 5).y + spacingY}`} fill="none" stroke="#eab308" strokeWidth="2.5" className="power-flow" opacity={0.6} />
-              <path d={`M ${getIsoCoordinates(0, 2).x + spacingX} ${getIsoCoordinates(0, 2).y + spacingY} L ${getIsoCoordinates(2, 5).x - spacingX} ${getIsoCoordinates(2, 5).y + spacingY}`} fill="none" stroke="#eab308" strokeWidth="2.5" className="power-flow" opacity={0.6} />
-              <path d={`M ${getIsoCoordinates(0, 5).x + spacingX} ${getIsoCoordinates(0, 5).y + spacingY} L ${getIsoCoordinates(5, 2).x - spacingX} ${getIsoCoordinates(5, 2).y + spacingY}`} fill="none" stroke="#eab308" strokeWidth="2.5" className="power-flow" opacity={0.6} />
+              <marker id="substation-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#eab308" />
+              </marker>
+            </defs>
 
-              {/* UPS backup lines to PDUs */}
-              <path d={`M ${getIsoCoordinates(7, 2).x - spacingX} ${getIsoCoordinates(7, 2).y + spacingY} L ${getIsoCoordinates(0, 2).x + spacingX} ${getIsoCoordinates(0, 2).y + spacingY}`} fill="none" stroke="#f97316" strokeWidth="2" className="power-flow" opacity={0.5} />
-              <path d={`M ${getIsoCoordinates(7, 5).x - spacingX} ${getIsoCoordinates(7, 5).y + spacingY} L ${getIsoCoordinates(0, 5).x + spacingX} ${getIsoCoordinates(0, 5).y + spacingY}`} fill="none" stroke="#f97316" strokeWidth="2" className="power-flow" opacity={0.5} />
+            {/* Wrapper Group for Alignment and Fitting */}
+            <g transform="translate(10, 15) scale(0.95)">
+              
+              {/* Green Lawn Isometric Base Plate */}
+              <polygon points="40,290 410,70 870,270 480,490" fill="#142217" stroke="#22c55e" strokeWidth="1.2" opacity="0.3" />
+              
+              {/* Small green bushes / plants on the left */}
+              <circle cx="65" cy="300" r="10" fill="#1b381e" stroke="#2c5e32" strokeWidth="1" />
+              <circle cx="80" cy="315" r="8" fill="#1b381e" stroke="#2c5e32" strokeWidth="1" />
+              <circle cx="60" cy="330" r="12" fill="#152b17" stroke="#224825" strokeWidth="1" />
 
-              {/* Generator -> UPS emergency line */}
-              <path d={`M ${getIsoCoordinates(7, 5).x} ${getIsoCoordinates(7, 5).y + spacingY * 1.5} Q 700 350 ${getIsoCoordinates(7, 2).x} ${getIsoCoordinates(7, 2).y + spacingY * 1.5}`} fill="none" stroke="#ef4444" strokeWidth="3" className="power-flow" opacity={0.7} />
-
-              {/* Battery -> UPS backup line */}
-              <path d={`M ${getIsoCoordinates(7, 0).x} ${getIsoCoordinates(7, 0).y + spacingY * 2} L ${getIsoCoordinates(7, 2).x} ${getIsoCoordinates(7, 2).y + spacingY}`} fill="none" stroke="#06b6d4" strokeWidth="2.5" className="power-flow" opacity={0.6} />
-
-              {/* Water pipes: Chiller supply (cold) to GPU hosts */}
-              <path d={`M ${getIsoCoordinates(3, 0).x} ${getIsoCoordinates(3, 0).y + spacingY * 2} L ${getIsoCoordinates(2, 2).x} ${getIsoCoordinates(2, 2).y + spacingY}`} fill="none" stroke="#22d3ee" strokeWidth="3" className="water-flow" opacity={0.6} />
-              <path d={`M ${getIsoCoordinates(3, 0).x} ${getIsoCoordinates(3, 0).y + spacingY * 2} L ${getIsoCoordinates(5, 2).x} ${getIsoCoordinates(5, 2).y + spacingY}`} fill="none" stroke="#22d3ee" strokeWidth="3" className="water-flow" opacity={0.6} />
-
-              {/* Water return (hot) from GPU hosts to Chiller */}
-              <path d={`M ${getIsoCoordinates(2, 2).x} ${getIsoCoordinates(2, 2).y + spacingY * 1.5} L ${getIsoCoordinates(3, 3).x} ${getIsoCoordinates(3, 3).y + spacingY} L ${getIsoCoordinates(3, 0).x} ${getIsoCoordinates(3, 0).y + spacingY}`} fill="none" stroke="#fb7185" strokeWidth="3" className="water-flow" opacity={0.6} />
-              <path d={`M ${getIsoCoordinates(5, 2).x} ${getIsoCoordinates(5, 2).y + spacingY * 1.5} L ${getIsoCoordinates(5, 3).x} ${getIsoCoordinates(5, 3).y + spacingY} L ${getIsoCoordinates(3, 3).x} ${getIsoCoordinates(3, 3).y + spacingY}`} fill="none" stroke="#fb7185" strokeWidth="3" className="water-flow" opacity={0.6} />
-
-              {/* Network cables - dashed green */}
-              <path d={`M ${getIsoCoordinates(2, 5).x} ${getIsoCoordinates(2, 5).y + spacingY} L ${getIsoCoordinates(2, 2).x} ${getIsoCoordinates(2, 2).y + spacingY * 1.5}`} fill="none" stroke="#76b900" strokeWidth="2" className="animated-cable" opacity={0.7} />
-              <path d={`M ${getIsoCoordinates(2, 5).x} ${getIsoCoordinates(2, 5).y + spacingY} L ${getIsoCoordinates(5, 2).x} ${getIsoCoordinates(5, 2).y + spacingY * 1.5}`} fill="none" stroke="#76b900" strokeWidth="2" className="animated-cable" opacity={0.7} />
-              <path d={`M ${getIsoCoordinates(2, 5).x} ${getIsoCoordinates(2, 5).y + spacingY} L ${getIsoCoordinates(5, 5).x} ${getIsoCoordinates(5, 5).y + spacingY}`} fill="none" stroke="#76b900" strokeWidth="2" className="animated-cable" opacity={0.7} />
-            </>
-          )}
-
-          {/* Airflow vectors */}
-          {cracPumpHigh && (
-            <>
-              <path d={`M ${getIsoCoordinates(0, 3).x} ${getIsoCoordinates(0, 3).y + spacingY} Q 250 200 ${getIsoCoordinates(2, 3).x} ${getIsoCoordinates(2, 3).y + spacingY}`} fill="none" stroke="rgba(59,130,246,0.4)" strokeWidth="3" className="cooling-flow" />
-              <path d={`M ${getIsoCoordinates(7, 3).x} ${getIsoCoordinates(7, 3).y + spacingY} Q 600 200 ${getIsoCoordinates(5, 3).x} ${getIsoCoordinates(5, 3).y + spacingY}`} fill="none" stroke="rgba(59,130,246,0.4)" strokeWidth="3" className="cooling-flow" />
-            </>
-          )}
-
-          {serversList.filter(o => o.type === 'vent').map(vent => {
-            const { x: isoX, y: isoY } = getIsoCoordinates(vent.x, vent.y)
-            return <polygon key={vent.id} points={`${isoX},${isoY} ${isoX + spacingX},${isoY + spacingY} ${isoX},${isoY + 2 * spacingY} ${isoX - spacingX},${isoY + spacingY}`} fill={vent5Replaced ? 'rgba(59,130,246,0.25)' : 'rgba(59,130,246,0.08)'} stroke="#3b82f6" strokeWidth="1.2" style={{ transition: 'all 0.3s' }} />
-          })}
-
-          {viewMode === '3D' ? (
-            sortedCabinets.filter(o => o.type !== 'vent').map(obj => {
-              const { vL, vR, vT, vB } = getBoxVertices(obj.x, obj.y)
-              let H = cabinetHeight
-              if (obj.type === 'chiller' || obj.type === 'crac') H = 45
-              if (obj.type === 'pdu' || obj.type === 'battery') H = 35
-              if (obj.type === 'ups' || obj.type === 'generator') H = 40
-              const tvL = { x: vL.x, y: vL.y - H }
-              const tvR = { x: vR.x, y: vR.y - H }
-              const tvT = { x: vT.x, y: vT.y - H }
-              const tvB = { x: vB.x, y: vB.y - H }
-
-              let fillFace = 'rgba(26,38,51,0.75)'
-              let strokeFace = '#2c3e50'
-              let glowBlade = '#22c55e'
-
-              if (obj.type === 'gpu') {
-                const temp = getGpuTemperature(obj.gpuId)
-                const isStressed = gpuStressStates[obj.gpuId]
-                if (isStressed) { fillFace = 'rgba(220,38,38,0.75)'; strokeFace = '#dc2626'; glowBlade = '#f85149' }
-                else if (temp > 65) { fillFace = 'rgba(217,119,6,0.7)'; strokeFace = '#d97706'; glowBlade = '#f59e0b' }
-                else { fillFace = 'rgba(16,185,129,0.65)'; strokeFace = '#10b981'; glowBlade = '#10b981' }
-              } else if (obj.type === 'scheduler') {
-                fillFace = activeJobs > 0 ? 'rgba(168,85,247,0.65)' : 'rgba(74,85,104,0.7)'; strokeFace = '#a855f7'; glowBlade = '#c084fc'
-              } else if (obj.type === 'storage') {
-                fillFace = 'rgba(245,158,11,0.6)'; strokeFace = '#f59e0b'; glowBlade = '#fbbf24'
-              } else if (obj.type === 'crac') {
-                const isActive = obj.id.startsWith('rack-custom-') ? true : cracPumpHigh
-                fillFace = isActive ? 'rgba(59,130,246,0.7)' : 'rgba(30,41,59,0.8)'; strokeFace = '#3b82f6'; glowBlade = '#60a5fa'
-              } else if (obj.type === 'pdu') {
-                fillFace = 'rgba(234,179,8,0.6)'; strokeFace = '#eab308'; glowBlade = '#facc15'
-              } else if (obj.type === 'ups') {
-                fillFace = 'rgba(249,115,22,0.65)'; strokeFace = '#f97316'; glowBlade = '#fb923c'
-              } else if (obj.type === 'generator') {
-                fillFace = 'rgba(220,38,38,0.65)'; strokeFace = '#dc2626'; glowBlade = '#ef4444'
-              } else if (obj.type === 'battery') {
-                fillFace = 'rgba(6,182,212,0.6)'; strokeFace = '#06b6d4'; glowBlade = '#22d3ee'
-              } else if (obj.type === 'chiller') {
-                fillFace = 'rgba(6,182,212,0.55)'; strokeFace = '#22d3ee'; glowBlade = '#67e8f9'
-              }
-
-              const isSelected = inspected?.id === obj.id
-
-              return (
-                <g key={obj.id} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setActiveTab({ type: obj.type, id: obj.id }) }}>
-                  <polygon points={`${vL.x},${vL.y} ${vB.x},${vB.y} ${tvB.x},${tvB.y} ${tvL.x},${tvL.y}`} fill={fillFace} stroke={strokeFace} strokeWidth={isSelected ? '2' : '1'} style={{ opacity: isSelected ? 1 : 0.85 }} />
-                  <polygon points={`${vR.x},${vR.y} ${vB.x},${vB.y} ${tvB.x},${tvB.y} ${tvR.x},${tvR.y}`} fill={fillFace} stroke={strokeFace} strokeWidth={isSelected ? '2' : '1'} />
-                  <polygon points={`${tvL.x},${tvL.y} ${tvT.x},${tvT.y} ${tvR.x},${tvR.y} ${tvB.x},${tvB.y}`} fill={fillFace} stroke={strokeFace} strokeWidth={isSelected ? '2' : '1'} style={{ opacity: 0.95 }} />
-                  
-                  {obj.type !== 'crac' && obj.type !== 'chiller' && obj.type !== 'vent' && (
-                    <>
-                      <line x1={vB.x + (vR.x - vB.x) * 0.2} y1={vB.y + (vR.y - vB.y) * 0.2 - H * 0.2} x2={vB.x + (vR.x - vB.x) * 0.8} y2={vB.y + (vR.y - vB.y) * 0.8 - H * 0.2} stroke={glowBlade} strokeWidth="2" style={{ opacity: 0.8 }} />
-                      <line x1={vB.x + (vR.x - vB.x) * 0.2} y1={vB.y + (vR.y - vB.y) * 0.2 - H * 0.4} x2={vB.x + (vR.x - vB.x) * 0.8} y2={vB.y + (vR.y - vB.y) * 0.8 - H * 0.4} stroke={glowBlade} strokeWidth="2" style={{ opacity: 0.8 }} />
-                      <line x1={vB.x + (vR.x - vB.x) * 0.2} y1={vB.y + (vR.y - vB.y) * 0.2 - H * 0.6} x2={vB.x + (vR.x - vB.x) * 0.8} y2={vB.y + (vR.y - vB.y) * 0.8 - H * 0.6} stroke={glowBlade} strokeWidth="2" style={{ opacity: 0.8 }} />
-                      {obj.type !== 'pdu' && obj.type !== 'battery' && obj.type !== 'ups' && obj.type !== 'generator' && (
-                        <line x1={vB.x + (vR.x - vB.x) * 0.2} y1={vB.y + (vR.y - vB.y) * 0.2 - H * 0.8} x2={vB.x + (vR.x - vB.x) * 0.8} y2={vB.y + (vR.y - vB.y) * 0.8 - H * 0.8} stroke={glowBlade} strokeWidth="2" style={{ opacity: 0.8 }} />
-                      )}
-                    </>
-                  )}
-
-                  {isSelected && (
-                    <g transform={`translate(${vT.x}, ${tvT.y - 12})`}>
-                      <rect x="-45" y="-12" width="90" height="18" rx="3" fill="#000" stroke={strokeFace} strokeWidth="1" />
-                      <text x="0" y="1" fill="#fff" fontSize="8" fontWeight="800" textAnchor="middle" fontFamily="monospace">{obj.label}</text>
-                    </g>
-                  )}
+              {/* ELECTRICITY TRANSMISSION PATHS */}
+              {/* Pulsing yellow electricity wires from Pylon to Substation */}
+              {showWiring && (
+                <g style={{ opacity: 0.85 }}>
+                  <path d="M 95 125 Q 110 220 170 300" fill="none" stroke="#eab308" strokeWidth="2" strokeDasharray="6,8" className="power-flow" filter="url(#glow)" />
+                  <path d="M 165 125 Q 170 220 180 300" fill="none" stroke="#eab308" strokeWidth="2" strokeDasharray="6,8" className="power-flow" filter="url(#glow)" />
+                  <path d="M 102 95 Q 130 210 190 300" fill="none" stroke="#eab308" strokeWidth="1.5" strokeDasharray="6,8" className="power-flow" filter="url(#glow)" />
+                  <path d="M 158 95 Q 140 210 200 300" fill="none" stroke="#eab308" strokeWidth="1.5" strokeDasharray="6,8" className="power-flow" filter="url(#glow)" />
                 </g>
-              )
-            })
-          ) : (
-            sortedCabinets.filter(o => o.type !== 'vent').map(obj => {
-              const { vL, vR, vT, vB } = getBoxVertices(obj.x, obj.y)
-              let blockColor = '#475569'
-              if (obj.type === 'gpu') {
-                const temp = getGpuTemperature(obj.gpuId)
-                blockColor = gpuStressStates[obj.gpuId] ? 'var(--red)' : temp > 65 ? 'var(--yellow)' : 'var(--accent)'
-              } else if (obj.type === 'scheduler') blockColor = '#a855f7'
-              else if (obj.type === 'storage') blockColor = '#f59e0b'
-              else if (obj.type === 'crac' || obj.type === 'chiller') blockColor = '#3b82f6'
-              else if (obj.type === 'pdu') blockColor = '#eab308'
-              else if (obj.type === 'ups') blockColor = '#f97316'
-              else if (obj.type === 'generator') blockColor = '#ef4444'
-              else if (obj.type === 'battery') blockColor = '#06b6d4'
-              const isSelected = inspected?.id === obj.id
-              return <polygon key={obj.id} points={`${vL.x},${vL.y} ${vT.x},${vT.y} ${vR.x},${vR.y} ${vB.x},${vB.y}`} fill={blockColor} stroke="#fff" strokeWidth={isSelected ? '2' : '0.5'} style={{ opacity: 0.85, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setActiveTab({ type: obj.type, id: obj.id }) }} />
-            })
-          )}
-        </svg>
+              )}
 
-        {isProvisioning && (
-          <div onMouseDown={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 0, left: 0, width: '260px', height: '100%', background: 'rgba(11,16,22,0.95)', backdropFilter: 'blur(10px)', borderRight: '1px solid rgba(255,255,255,0.08)', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', zIndex: 100, fontSize: '0.7rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.35rem' }}>
-              <span style={{ fontWeight: 800, color: '#fff' }}>PROVISION CABINET</span>
-              <button onClick={() => setIsProvisioning(false)} style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', fontSize: '1rem' }}>×</button>
-            </div>
-            <div><label style={{ display: 'block', marginBottom: '0.2rem', color: '#8b949e' }}>Identifier</label><input type="text" value={provName} onChange={e => setProvName(e.target.value)} style={{ width: '100%', padding: '0.3rem', background: '#050505', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', borderRadius: '3px', outline: 'none' }} /></div>
-            <div><label style={{ display: 'block', marginBottom: '0.2rem', color: '#8b949e' }}>System Type</label>
-              <select value={provType} onChange={e => setProvType(e.target.value)} style={{ width: '100%', padding: '0.3rem', background: '#050505', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', borderRadius: '3px' }}>
-                <option value="gpu">GPU Node</option><option value="storage">Storage Array</option><option value="crac">CRAC Cooling</option>
-              </select>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-              <div><label style={{ display: 'block', marginBottom: '0.2rem', color: '#8b949e' }}>X</label>
-                <select value={provX} onChange={e => setProvX(e.target.value)} style={{ width: '100%', padding: '0.3rem', background: '#050505', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', borderRadius: '3px' }}>
-                  {[0,1,2,3,4,5,6,7].map(x => <option key={x} value={x}>{x}</option>)}
-                </select>
+              {/* Substation conduit going into Computer Room */}
+              {showWiring && (
+                <path d="M 220 340 Q 250 355 280 270" fill="none" stroke="#e3a808" strokeWidth="3" className="power-flow" opacity="0.75" />
+              )}
+
+              {/* --- Electricity Transmission Tower (Pylon) --- */}
+              <g transform="translate(130, 270)">
+                {/* Shadow */}
+                <ellipse cx="0" cy="0" rx="30" ry="15" fill="black" opacity="0.45" filter="url(#shadow-blur)" />
+                {/* Structure Lines */}
+                <line x1="-25" y1="-15" x2="-5" y2="-140" stroke="url(#pylonGrad)" strokeWidth="2.5" />
+                <line x1="25" y1="-15" x2="5" y2="-140" stroke="url(#pylonGrad)" strokeWidth="2.5" />
+                <line x1="0" y1="0" x2="0" y2="-140" stroke="url(#pylonGrad)" strokeWidth="2.5" opacity="0.6" />
+                <line x1="0" y1="-30" x2="0" y2="-140" stroke="url(#pylonGrad)" strokeWidth="2.5" opacity="0.6" />
+                {/* Upper shaft */}
+                <line x1="-5" y1="-140" x2="-3" y2="-200" stroke="url(#pylonGrad)" strokeWidth="2" />
+                <line x1="5" y1="-140" x2="3" y2="-200" stroke="url(#pylonGrad)" strokeWidth="2" />
+                <line x1="-3" y1="-200" x2="0" y2="-225" stroke="url(#pylonGrad)" strokeWidth="1.5" />
+                <line x1="3" y1="-200" x2="0" y2="-225" stroke="url(#pylonGrad)" strokeWidth="1.5" />
+                {/* Cross braces */}
+                <line x1="-25" y1="-15" x2="0" y2="-70" stroke="url(#pylonGrad)" strokeWidth="1.5" />
+                <line x1="25" y1="-15" x2="0" y2="-70" stroke="url(#pylonGrad)" strokeWidth="1.5" />
+                <line x1="0" y1="0" x2="0" y2="-70" stroke="url(#pylonGrad)" strokeWidth="1.5" />
+                <line x1="-25" y1="-15" x2="0" y2="-110" stroke="url(#pylonGrad)" strokeWidth="1.5" />
+                <line x1="25" y1="-15" x2="0" y2="-110" stroke="url(#pylonGrad)" strokeWidth="1.5" />
+                <line x1="-5" y1="-140" x2="5" y2="-175" stroke="url(#pylonGrad)" strokeWidth="1.5" />
+                <line x1="5" y1="-140" x2="-5" y2="-175" stroke="url(#pylonGrad)" strokeWidth="1.5" />
+                {/* Crossarms */}
+                <line x1="-35" y1="-160" x2="35" y2="-160" stroke="url(#pylonGrad)" strokeWidth="2.2" />
+                <line x1="-28" y1="-190" x2="28" y2="-190" stroke="url(#pylonGrad)" strokeWidth="2.2" />
+                {/* Crossarm struts */}
+                <line x1="-35" y1="-160" x2="0" y2="-145" stroke="url(#pylonGrad)" strokeWidth="1.2" />
+                <line x1="35" y1="-160" x2="0" y2="-145" stroke="url(#pylonGrad)" strokeWidth="1.2" />
+                <line x1="-28" y1="-190" x2="0" y2="-175" stroke="url(#pylonGrad)" strokeWidth="1.2" />
+                <line x1="28" y1="-190" x2="0" y2="-175" stroke="url(#pylonGrad)" strokeWidth="1.2" />
+                {/* Insulators */}
+                <line x1="-35" y1="-160" x2="-35" y2="-145" stroke="#94a3b8" strokeWidth="2" strokeDasharray="2,2" />
+                <line x1="35" y1="-160" x2="35" y2="-145" stroke="#94a3b8" strokeWidth="2" strokeDasharray="2,2" />
+                <line x1="-28" y1="-190" x2="-28" y2="-175" stroke="#94a3b8" strokeWidth="2" strokeDasharray="2,2" />
+                <line x1="28" y1="-190" x2="28" y2="-175" stroke="#94a3b8" strokeWidth="2" strokeDasharray="2,2" />
+              </g>
+
+              {/* --- Substation / Transformers --- */}
+              <g>
+                {/* Transformer 1 (back) */}
+                <g>
+                  <ellipse cx="180" cy="330" rx="20" ry="10" fill="black" opacity="0.3" filter="url(#shadow-blur)" />
+                  <polygon points="165,305 195,320 195,335 165,320" fill="#b91c1c" stroke="#7f1d1d" strokeWidth="0.8" />
+                  <polygon points="195,320 195,335 205,330 205,315" fill="#991b1b" stroke="#7f1d1d" strokeWidth="0.8" />
+                  <polygon points="165,305 195,320 205,315 175,300" fill="#ef4444" stroke="#b91c1c" strokeWidth="0.8" />
+                  {/* Cooling fins */}
+                  <line x1="172" y1="324" x2="172" y2="312" stroke="#7f1d1d" strokeWidth="1.2" />
+                  <line x1="179" y1="327" x2="179" y2="315" stroke="#7f1d1d" strokeWidth="1.2" />
+                  <line x1="186" y1="331" x2="186" y2="319" stroke="#7f1d1d" strokeWidth="1.2" />
+                  {/* HV bushings */}
+                  <line x1="175" y1="305" x2="175" y2="297" stroke="#94a3b8" strokeWidth="1.5" />
+                  <line x1="185" y1="310" x2="185" y2="302" stroke="#94a3b8" strokeWidth="1.5" />
+                  <circle cx="175" cy="297" r="2.2" fill="#ef4444" />
+                  <circle cx="185" cy="302" r="2.2" fill="#ef4444" />
+                </g>
+
+                {/* Transformer 2 (front) */}
+                <g>
+                  <ellipse cx="220" cy="355" rx="20" ry="10" fill="black" opacity="0.3" filter="url(#shadow-blur)" />
+                  <polygon points="205,330 235,345 235,360 205,345" fill="#b91c1c" stroke="#7f1d1d" strokeWidth="0.8" />
+                  <polygon points="235,345 235,360 245,355 245,340" fill="#991b1b" stroke="#7f1d1d" strokeWidth="0.8" />
+                  <polygon points="205,330 235,345 245,340 215,325" fill="#ef4444" stroke="#b91c1c" strokeWidth="0.8" />
+                  {/* Cooling fins */}
+                  <line x1="212" y1="349" x2="212" y2="337" stroke="#7f1d1d" strokeWidth="1.2" />
+                  <line x1="219" y1="352" x2="219" y2="340" stroke="#7f1d1d" strokeWidth="1.2" />
+                  <line x1="226" y1="356" x2="226" y2="344" stroke="#7f1d1d" strokeWidth="1.2" />
+                  {/* HV bushings */}
+                  <line x1="215" y1="330" x2="215" y2="322" stroke="#94a3b8" strokeWidth="1.5" />
+                  <line x1="225" y1="335" x2="225" y2="327" stroke="#94a3b8" strokeWidth="1.5" />
+                  <circle cx="215" cy="322" r="2.2" fill="#ef4444" />
+                  <circle cx="225" cy="327" r="2.2" fill="#ef4444" />
+                </g>
+              </g>
+
+              {/* --- Computer Room --- */}
+              <g>
+                {/* Platform Slab */}
+                <polygon points="380,150  550,235  380,320  210,235" fill="#1c2530" stroke="#334155" strokeWidth="1" />
+                {/* 3D Extrusion Side */}
+                <polygon points="210,235  380,320  380,328  210,243" fill="#101720" stroke="#253545" strokeWidth="0.5" />
+                <polygon points="550,235  380,320  380,328  550,243" fill="#0b1016" stroke="#253545" strokeWidth="0.5" />
+                
+                {/* Enclosure Fence Post Verticals */}
+                <line x1="210" y1="235" x2="210" y2="185" stroke="#475569" strokeWidth="1.8" />
+                <line x1="380" y1="150" x2="380" y2="100" stroke="#475569" strokeWidth="1.8" />
+                <line x1="550" y1="235" x2="550" y2="185" stroke="#475569" strokeWidth="1.8" />
+                <line x1="380" y1="320" x2="380" y2="270" stroke="#475569" strokeWidth="1.8" />
+                {/* Enclosure Horizontal Rails */}
+                <path d="M 210 175 L 380 90 L 550 175 L 380 260 Z" fill="none" stroke="#475569" strokeWidth="1.5" />
+                <path d="M 210 200 L 380 115 L 550 200 L 380 285 Z" fill="none" stroke="#334155" strokeWidth="1.2" />
+                {/* Semi-transparent Glass panels */}
+                <polygon points="210,235 210,175 380,90 380,140" fill="rgba(148,163,184,0.06)" stroke="none" />
+                <polygon points="380,140 380,90 550,175 550,225" fill="rgba(148,163,184,0.06)" stroke="none" />
+
+                {/* Fire Suppression Gas Cylinders at entrance */}
+                <g transform="translate(235, 245)">
+                  <ellipse cx="0" cy="0" rx="6" ry="3" fill="black" opacity="0.3" />
+                  <rect x="-3" y="-18" width="6" height="18" rx="2" fill="#ef4444" stroke="#991b1b" strokeWidth="0.8" />
+                  <rect x="-3" y="-18" width="1.5" height="18" fill="#fca5a5" opacity="0.6" />
+                  <path d="M -1 -18 L -1 -22 L 1 -22" fill="none" stroke="#cbd5e1" strokeWidth="0.8" />
+                </g>
+                <g transform="translate(245, 250)">
+                  <ellipse cx="0" cy="0" rx="6" ry="3" fill="black" opacity="0.3" />
+                  <rect x="-3" y="-18" width="6" height="18" rx="2" fill="#ef4444" stroke="#991b1b" strokeWidth="0.8" />
+                  <rect x="-3" y="-18" width="1.5" height="18" fill="#fca5a5" opacity="0.6" />
+                  <path d="M -1 -18 L -1 -22 L 1 -22" fill="none" stroke="#cbd5e1" strokeWidth="0.8" />
+                </g>
+
+                {/* Server Cabinets inside - Rendered Back to Front */}
+                {/* Row 1 (back-left) */}
+                {renderDataCenterServerRack(290, 205, 'rack-gpu-0')}
+                {renderDataCenterServerRack(320, 190, 'rack-gpu-1')}
+                {renderDataCenterServerRack(350, 175, 'rack-scheduler')}
+                {/* Row 2 (middle) */}
+                {renderDataCenterServerRack(320, 230, 'rack-storage')}
+                {renderDataCenterServerRack(350, 215, 'rack-pdu-1')}
+                {renderDataCenterServerRack(380, 200, 'rack-pdu-2')}
+                {/* Row 3 (front-right) */}
+                {renderDataCenterServerRack(350, 255, 'custom-0')}
+                {renderDataCenterServerRack(380, 240, 'custom-1')}
+                {renderDataCenterServerRack(410, 225, 'custom-2')}
+              </g>
+
+              {/* --- Cooling System Cabinets (Back Center) --- */}
+              <g>
+                {renderCoolingCabinet(470, 180, 'crac-01')}
+                {renderCoolingCabinet(500, 165, 'crac-02')}
+                {renderCoolingCabinet(530, 150, 'crac-03')}
+              </g>
+
+              {/* --- UPS Battery Racks (Red/Blue) --- */}
+              <g>
+                {renderUPSRack(500, 250, false, 'ups-01')}
+                {renderUPSRack(530, 235, true, 'ups-02')}
+                {renderUPSRack(560, 220, false, 'ups-03')}
+              </g>
+
+              {/* --- Control Room Desk & Operator --- */}
+              <g transform="translate(430, 340)">
+                {/* Shadow */}
+                <ellipse cx="0" cy="0" rx="22" ry="10" fill="black" opacity="0.3" />
+                {/* Desk Frame */}
+                <polygon points="-20,-5 20,-15 20,-3 -20,7" fill="#475569" stroke="#334155" strokeWidth="0.5" />
+                <polygon points="-20,-15 -20,-5 -5,2 -5,-8" fill="#1e293b" />
+                <polygon points="20,-25 20,-15 5,-8 5,-18" fill="#334155" />
+                {/* Desktop surface (curved console) */}
+                <polygon points="-20,-15 20,-25 10,-30 -10,-20" fill="#334155" stroke="#1e293b" strokeWidth="0.5" />
+                {/* Glowing Monitor screens */}
+                <g transform="translate(-10, -26) scale(0.6)">
+                  <rect x="-8" y="-12" width="16" height="10" fill="#030712" stroke="#00f2fe" strokeWidth="1" filter="url(#glow)" />
+                  <path d="M -6 -7 L -2 -9 L 2 -6 L 6 -10" fill="none" stroke="#22d3ee" strokeWidth="0.8" />
+                </g>
+                <g transform="translate(5, -28) scale(0.6)">
+                  <rect x="-8" y="-12" width="16" height="10" fill="#030712" stroke="#00f2fe" strokeWidth="1" filter="url(#glow)" />
+                  <path d="M -6 -10 L 0 -5 L 6 -8" fill="none" stroke="#22d3ee" strokeWidth="0.8" />
+                </g>
+                {/* Chair & Operator */}
+                <circle cx="-5" cy="5" r="5" fill="#475569" />
+                <circle cx="-5" cy="-2" r="3.5" fill="#f8fafc" />
+                <path d="M -8 5 Q -5 -2 -2 5 Z" fill="#334155" />
+              </g>
+
+              {/* --- White Administration / Control Cabinets --- */}
+              <g>
+                {renderAdminCabinet(600, 270, 'admin-01')}
+                {renderAdminCabinet(630, 255, 'admin-02')}
+                {renderAdminCabinet(660, 240, 'admin-03')}
+              </g>
+
+              {/* --- Blue Cooling Water Pipeline --- */}
+              <g>
+                <path d="M 690 310 L 465 425" fill="none" stroke="#1d4ed8" strokeWidth="4.5" />
+                {/* Moving water flow indicators */}
+                <path d="M 690 310 L 465 425" fill="none" stroke="#60a5fa" strokeWidth="4.5" strokeDasharray="5,15" className="water-flow" filter="url(#glow)" />
+                {/* Incoming water blue arrow */}
+                <path d="M 675 298 L 695 308 L 680 318" fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" />
+                {/* Floating water droplets */}
+                <circle cx="690" cy="285" r="2" fill="#60a5fa" className="wind-wave" style={{ animationDelay: '0s' }} />
+                <circle cx="700" cy="295" r="3.2" fill="#3b82f6" className="wind-wave" style={{ animationDelay: '0.6s' }} />
+                <circle cx="682" cy="298" r="1.8" fill="#93c5fd" className="wind-wave" style={{ animationDelay: '1.2s' }} />
+              </g>
+
+              {/* --- Cooling Towers (Front Right) --- */}
+              <g>
+                {renderAIWaterCoolingTower(500, 390, 'tower-01')}
+                {renderAIWaterCoolingTower(560, 360, 'tower-02')}
+                {renderAIWaterCoolingTower(620, 330, 'tower-03')}
+              </g>
+
+              {/* --- Diesel Generators & Wall Condenser Fans (Far Right) --- */}
+              <g>
+                {renderDieselGenerator(710, 310, 'gen-01')}
+                {renderDieselGenerator(770, 280, 'gen-02')}
+                {renderDieselGenerator(830, 250, 'gen-03')}
+              </g>
+
+              {/* --- Connector Lines & Badge Labels (Matching Merged Reference Images) --- */}
+              <g style={{ fontFamily: 'system-ui, sans-serif', fontSize: '9px', fontWeight: 'bold' }}>
+                {/* 1. Electricity Badge */}
+                <line x1="130" y1="95" x2="110" y2="60" stroke="#94a3b8" strokeWidth="1" strokeDasharray="2,2" />
+                <g transform="translate(75, 42)" onClick={() => handleInspect('rack-pdu-1')} style={{ cursor: 'pointer' }}>
+                  <rect x="0" y="0" width="65" height="18" rx="4" fill="#fef08a" stroke="#eab308" strokeWidth="1" filter="url(#glow)" />
+                  <text x="32.5" y="12" fill="#854d0e" textAnchor="middle" fontSize="9">Electricity</text>
+                </g>
+
+                {/* 2. Computer Room Badge */}
+                <line x1="350" y1="175" x2="280" y2="120" stroke="#94a3b8" strokeWidth="1" strokeDasharray="2,2" />
+                <g transform="translate(235, 102)" onClick={() => handleInspect('rack-gpu-0')} style={{ cursor: 'pointer' }}>
+                  <rect x="0" y="0" width="85" height="18" rx="4" fill="#bbf7d0" stroke="#22c55e" strokeWidth="1" filter="url(#glow)" />
+                  <text x="42.5" y="12" fill="#166534" textAnchor="middle" fontSize="9">Computer Room</text>
+                </g>
+
+                {/* 3. Cooling system Badge */}
+                <line x1="500" y1="165" x2="600" y2="105" stroke="#94a3b8" strokeWidth="1" strokeDasharray="2,2" />
+                <g transform="translate(565, 87)" onClick={() => handleInspect('crac-01')} style={{ cursor: 'pointer' }}>
+                  <rect x="0" y="0" width="85" height="18" rx="4" fill="#bfdbfe" stroke="#3b82f6" strokeWidth="1" filter="url(#glow)" />
+                  <text x="42.5" y="12" fill="#1e40af" textAnchor="middle" fontSize="9">Cooling system</text>
+                </g>
+
+                {/* 4. Cooling Tower Badge */}
+                <line x1="620" y1="330" x2="720" y2="280" stroke="#94a3b8" strokeWidth="1" strokeDasharray="2,2" />
+                <g transform="translate(685, 262)" onClick={() => handleInspect('rack-chiller')} style={{ cursor: 'pointer' }}>
+                  <rect x="0" y="0" width="80" height="18" rx="4" fill="#bfdbfe" stroke="#3b82f6" strokeWidth="1" filter="url(#glow)" />
+                  <text x="40" y="12" fill="#1e40af" textAnchor="middle" fontSize="9">Cooling Tower</text>
+                </g>
+
+                {/* 5. Water Badge */}
+                <line x1="690" y1="310" x2="760" y2="265" stroke="#94a3b8" strokeWidth="1" strokeDasharray="2,2" />
+                <g transform="translate(740, 247)" onClick={() => handleInspect('rack-chiller')} style={{ cursor: 'pointer' }}>
+                  <rect x="0" y="0" width="45" height="18" rx="4" fill="#3b82f6" stroke="#1d4ed8" strokeWidth="1" filter="url(#glow)" />
+                  <text x="22.5" y="12" fill="#ffffff" textAnchor="middle" fontSize="9">Water</text>
+                </g>
+
+                {/* 6. UPS Badge */}
+                <line x1="530" y1="235" x2="495" y2="195" stroke="#94a3b8" strokeWidth="1" strokeDasharray="2,2" />
+                <g transform="translate(470, 177)" onClick={() => handleInspect('rack-ups')} style={{ cursor: 'pointer' }}>
+                  <rect x="0" y="0" width="45" height="18" rx="4" fill="#fef08a" stroke="#eab308" strokeWidth="1" filter="url(#glow)" />
+                  <text x="22.5" y="12" fill="#854d0e" textAnchor="middle" fontSize="9">UPS</text>
+                </g>
+
+                {/* 7. Diesel Generator Badge */}
+                <line x1="770" y1="280" x2="815" y2="350" stroke="#94a3b8" strokeWidth="1" strokeDasharray="2,2" />
+                <g transform="translate(775, 332)" onClick={() => handleInspect('rack-generator')} style={{ cursor: 'pointer' }}>
+                  <rect x="0" y="0" width="95" height="18" rx="4" fill="#fef08a" stroke="#eab308" strokeWidth="1" filter="url(#glow)" />
+                  <text x="47.5" y="12" fill="#854d0e" textAnchor="middle" fontSize="9">Diesel Generator</text>
+                </g>
+
+                {/* 8. Administration Badge */}
+                <line x1="630" y1="255" x2="570" y2="310" stroke="#94a3b8" strokeWidth="1" strokeDasharray="2,2" />
+                <g transform="translate(525, 292)" onClick={() => handleInspect('rack-battery')} style={{ cursor: 'pointer' }}>
+                  <rect x="0" y="0" width="85" height="18" rx="4" fill="#fef08a" stroke="#eab308" strokeWidth="1" filter="url(#glow)" />
+                  <text x="42.5" y="12" fill="#854d0e" textAnchor="middle" fontSize="9">Administration</text>
+                </g>
+
+                {/* 9. Control Panel Badge */}
+                <line x1="430" y1="340" x2="355" y2="400" stroke="#94a3b8" strokeWidth="1" strokeDasharray="2,2" />
+                <g transform="translate(310, 382)" onClick={() => handleInspect('rack-scheduler')} style={{ cursor: 'pointer' }}>
+                  <rect x="0" y="0" width="80" height="18" rx="4" fill="#fef08a" stroke="#eab308" strokeWidth="1" filter="url(#glow)" />
+                  <text x="40" y="12" fill="#854d0e" textAnchor="middle" fontSize="9">Control Panel</text>
+                </g>
+
+                {/* 10. Flooding Sys Badge */}
+                <line x1="240" y1="255" x2="190" y2="210" stroke="#94a3b8" strokeWidth="1" strokeDasharray="2,2" />
+                <g transform="translate(145, 192)" onClick={() => handleInspect('rack-storage')} style={{ cursor: 'pointer' }}>
+                  <rect x="0" y="0" width="75" height="18" rx="4" fill="#fef08a" stroke="#eab308" strokeWidth="1" filter="url(#glow)" />
+                  <text x="37.5" y="12" fill="#854d0e" textAnchor="middle" fontSize="9">Flooding Sys</text>
+                </g>
+              </g>
+
+            </g>
+          </svg>
+        </div>
+
+        {/* Right side controls/stats */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'space-between' }}>
+          
+          {/* Telemetry Panels in 2x2 grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', flex: 1 }}>
+            
+            <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderTop: '3px solid #06b6d4', borderRadius: '4px', padding: '0.75rem' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.25rem' }}>WATER COOLING</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.7rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>CHILLER FLOW</span><span style={{ fontWeight: 700 }}>{powerTel.chillerFlow.toFixed(0)} L/min</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>SUPPLY / RETURN</span><span style={{ fontWeight: 700 }}>{powerTel.chillerSupply.toFixed(1)}°C / {powerTel.chillerReturn.toFixed(1)}°C</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent)' }}><span>WATER CONSUMPTION</span><span style={{ fontWeight: 700 }}>{powerTel.waterConsumption.toFixed(0)} L/hr</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>WUE</span><span style={{ fontWeight: 700 }}>{powerTel.wue.toFixed(2)} L/kWh</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '0.35rem' }}><span style={{ color: '#8b949e' }}>DELTA T</span><span style={{ fontWeight: 700, color: '#06b6d4' }}>{(powerTel.chillerReturn - powerTel.chillerSupply).toFixed(1)}°C</span></div>
               </div>
-              <div><label style={{ display: 'block', marginBottom: '0.2rem', color: '#8b949e' }}>Y</label>
-                <select value={provY} onChange={e => setProvY(e.target.value)} style={{ width: '100%', padding: '0.3rem', background: '#050505', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', borderRadius: '3px' }}>
-                  {[0,1,2,3,4,5,6,7].map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
+            </div>
+
+            <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderTop: '3px solid #f97316', borderRadius: '4px', padding: '0.75rem' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.25rem' }}>UPS & POWER DIST</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.7rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>UPS LOAD</span><span style={{ fontWeight: 700, color: powerTel.upsLoad > 80 ? '#ef4444' : '#f97316' }}>{powerTel.upsLoad.toFixed(0)}%</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>UPS BATTERY</span><span style={{ fontWeight: 700, color: powerTel.upsBattery < 30 ? '#ef4444' : '#f97316' }}>{powerTel.upsBattery.toFixed(0)}%</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>PDU-A LOAD</span><span style={{ fontWeight: 700 }}>{powerTel.pdu1Load.toFixed(0)}%</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>PDU-B LOAD</span><span style={{ fontWeight: 700 }}>{powerTel.pdu2Load.toFixed(0)}%</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '0.35rem' }}><span style={{ color: '#8b949e' }}>TOTAL DIST</span><span style={{ fontWeight: 700, color: '#f97316' }}>{(powerTel.pdu1Load + powerTel.pdu2Load).toFixed(0)}%</span></div>
               </div>
             </div>
-            {provType === 'gpu' && (
-              <>
-                <div><label style={{ display: 'block', marginBottom: '0.2rem', color: '#8b949e' }}>Model</label>
-                  <select value={provModel} onChange={e => setProvModel(e.target.value)} style={{ width: '100%', padding: '0.3rem', background: '#050505', border: '1px solid rgba(255,255,255,0.05)', color: '#fff', borderRadius: '3px' }}>
-                    <option>NVIDIA H100 v3 (32GB)</option><option>NVIDIA A100 SXM (80GB)</option><option>NVIDIA L40S PCIe (48GB)</option>
-                  </select>
-                </div>
-                <div><label style={{ display: 'block', marginBottom: '0.2rem', color: '#8b949e' }}>Power: {provPower}W</label>
-                  <input type="range" min="150" max="450" step="50" value={provPower} onChange={e => setProvPower(e.target.value)} style={{ width: '100%', accentColor: 'var(--accent)' }} />
-                </div>
-              </>
-            )}
-            {provError && <div style={{ color: 'var(--red)', fontSize: '0.6rem' }}>{provError}</div>}
-            <button onClick={handleDeployCabinet} style={{ width: '100%', padding: '0.45rem', borderRadius: '4px', background: 'var(--accent)', border: 'none', color: '#000', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', marginTop: 'auto' }}>
-              Deploy Cabinet
-            </button>
+
+            <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderTop: '3px solid #ef4444', borderRadius: '4px', padding: '0.75rem' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.25rem' }}>BACKUP GENERATOR</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.7rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>STATUS</span><span style={{ fontWeight: 700, color: genActive ? '#ef4444' : '#22c55e' }}>{genActive ? 'ACTIVE' : 'STANDBY'}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>FUEL LEVEL</span><span style={{ fontWeight: 700, color: powerTel.genFuel < 20 ? '#ef4444' : '#f59e0b' }}>{powerTel.genFuel.toFixed(0)}%</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>RPM</span><span style={{ fontWeight: 700 }}>{genActive ? powerTel.genRpm.toFixed(0) : '0'}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>OUTPUT</span><span style={{ fontWeight: 700 }}>{powerTel.genOutput.toFixed(0)} kW</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '0.35rem' }}><span style={{ color: '#8b949e' }}>RUNTIME REM</span><span style={{ fontWeight: 700, color: genActive ? '#ef4444' : '#8b949e' }}>{genActive ? `${(powerTel.genFuel / 100 * 48).toFixed(1)}h` : 'N/A'}</span></div>
+              </div>
+            </div>
+
+            <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderTop: '3px solid #06b6d4', borderRadius: '4px', padding: '0.75rem' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.25rem' }}>BATTERY STORAGE</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.7rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>SOC</span><span style={{ fontWeight: 700, color: powerTel.batteryCharge < 30 ? '#ef4444' : '#06b6d4' }}>{powerTel.batteryCharge.toFixed(0)}%</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>TEMPERATURE</span><span style={{ fontWeight: 700 }}>{powerTel.batteryTemp.toFixed(1)}°C</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>MODE</span><span style={{ fontWeight: 700, color: batteryCharging ? '#22c55e' : '#f97316' }}>{batteryCharging ? 'CHARGING' : 'DISCHARGING'}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>CAPACITY</span><span style={{ fontWeight: 700 }}>2.4 MWh LFP</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '0.35rem' }}><span style={{ color: '#8b949e' }}>SOH</span><span style={{ fontWeight: 700, color: '#06b6d4' }}>94.2%</span></div>
+              </div>
+            </div>
+
           </div>
-        )}
 
-        <div style={{ position: 'absolute', top: '0.75rem', left: '1rem', display: 'flex', gap: '0.5rem', fontSize: '0.6rem', background: 'rgba(5,5,5,0.85)', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)', zIndex: 10, color: 'var(--text-muted)' }}>
-          <span>DRAG TO ROTATE 360° FLOOR PLAN</span>
-        </div>
-      </div>
-
-      {/* Telemetry Panels */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-        <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderTop: '3px solid #06b6d4', borderRadius: '4px', padding: '0.75rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.25rem' }}>WATER COOLING</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.7rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>CHILLER FLOW</span><span style={{ fontWeight: 700 }}>{powerTel.chillerFlow.toFixed(0)} L/min</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>SUPPLY / RETURN</span><span style={{ fontWeight: 700 }}>{powerTel.chillerSupply.toFixed(1)}°C / {powerTel.chillerReturn.toFixed(1)}°C</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--accent)' }}><span>WATER CONSUMPTION</span><span style={{ fontWeight: 700 }}>{powerTel.waterConsumption.toFixed(0)} L/hr</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>WUE</span><span style={{ fontWeight: 700 }}>{powerTel.wue.toFixed(2)} L/kWh</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '0.35rem' }}><span style={{ color: '#8b949e' }}>DELTA T</span><span style={{ fontWeight: 700, color: '#06b6d4' }}>{(powerTel.chillerReturn - powerTel.chillerSupply).toFixed(1)}°C</span></div>
+          {/* IT/DC capacity controls */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: '#0e141a', padding: '0.75rem 1rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)', fontSize: '0.7rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>IT/DC SYSTEM CAPACITY:</span>
+              <span style={{ fontWeight: 700 }}>{itDcLoad.toFixed(1)} / 1000.0 kW</span>
+            </div>
+            <div style={{ height: '6px', background: '#11161d', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(100, (itDcLoad / 1000) * 100)}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.5s ease' }} />
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.25rem' }}>
+              <span>SITE MAIN POWER:</span>
+              <span style={{ fontWeight: 700 }}>{totalSitePower.toFixed(1)} / 1350.0 kW</span>
+            </div>
+            <div style={{ height: '6px', background: '#11161d', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(100, (totalSitePower / 1350) * 100)}%`, height: '100%', background: totalSitePower > 900 ? 'var(--red)' : 'var(--yellow)', transition: 'width 0.5s ease' }} />
+            </div>
           </div>
+
         </div>
 
-        <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderTop: '3px solid #f97316', borderRadius: '4px', padding: '0.75rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.25rem' }}>UPS & POWER DISTRIBUTION</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.7rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>UPS LOAD</span><span style={{ fontWeight: 700, color: powerTel.upsLoad > 80 ? '#ef4444' : '#f97316' }}>{powerTel.upsLoad.toFixed(0)}%</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>UPS BATTERY</span><span style={{ fontWeight: 700, color: powerTel.upsBattery < 30 ? '#ef4444' : '#f97316' }}>{powerTel.upsBattery.toFixed(0)}%</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>PDU-A LOAD</span><span style={{ fontWeight: 700 }}>{powerTel.pdu1Load.toFixed(0)}%</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>PDU-B LOAD</span><span style={{ fontWeight: 700 }}>{powerTel.pdu2Load.toFixed(0)}%</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '0.35rem' }}><span style={{ color: '#8b949e' }}>TOTAL DISTRIBUTED</span><span style={{ fontWeight: 700, color: '#f97316' }}>{(powerTel.pdu1Load + powerTel.pdu2Load).toFixed(0)}%</span></div>
-          </div>
-        </div>
-
-        <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderTop: '3px solid #ef4444', borderRadius: '4px', padding: '0.75rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.25rem' }}>BACKUP GENERATOR</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.7rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>STATUS</span><span style={{ fontWeight: 700, color: genActive ? '#ef4444' : '#22c55e' }}>{genActive ? 'ACTIVE' : 'STANDBY'}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>FUEL LEVEL</span><span style={{ fontWeight: 700, color: powerTel.genFuel < 20 ? '#ef4444' : '#f59e0b' }}>{powerTel.genFuel.toFixed(0)}%</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>RPM</span><span style={{ fontWeight: 700 }}>{genActive ? powerTel.genRpm.toFixed(0) : '0'}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>OUTPUT</span><span style={{ fontWeight: 700 }}>{powerTel.genOutput.toFixed(0)} kW</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '0.35rem' }}><span style={{ color: '#8b949e' }}>RUNTIME REMAINING</span><span style={{ fontWeight: 700, color: genActive ? '#ef4444' : '#8b949e' }}>{genActive ? `${(powerTel.genFuel / 100 * 48).toFixed(1)}h` : 'N/A'}</span></div>
-          </div>
-        </div>
-
-        <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderTop: '3px solid #06b6d4', borderRadius: '4px', padding: '0.75rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.25rem' }}>BATTERY STORAGE</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.7rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>STATE OF CHARGE</span><span style={{ fontWeight: 700, color: powerTel.batteryCharge < 30 ? '#ef4444' : '#06b6d4' }}>{powerTel.batteryCharge.toFixed(0)}%</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>TEMPERATURE</span><span style={{ fontWeight: 700 }}>{powerTel.batteryTemp.toFixed(1)}°C</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>MODE</span><span style={{ fontWeight: 700, color: batteryCharging ? '#22c55e' : '#f97316' }}>{batteryCharging ? 'CHARGING' : 'DISCHARGING'}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#8b949e' }}>CAPACITY</span><span style={{ fontWeight: 700 }}>2.4 MWh LFP</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '0.35rem' }}><span style={{ color: '#8b949e' }}>SOH</span><span style={{ fontWeight: 700, color: '#06b6d4' }}>94.2%</span></div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: '#0e141a', padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)', fontSize: '0.7rem' }}>
-        <span>IT/DC SYSTEM CAPACITY:</span>
-        <div style={{ flex: 1, height: '8px', background: '#11161d', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
-          <div style={{ width: `${Math.min(100, (itDcLoad / 1000) * 100)}%`, background: 'var(--accent)', transition: 'width 0.5s ease' }} />
-        </div>
-        <span style={{ fontWeight: 700 }}>{itDcLoad.toFixed(1)} / 1000.0 kW</span>
-        <span style={{ marginLeft: '1rem' }}>SITE MAIN POWER:</span>
-        <div style={{ flex: 1, height: '8px', background: '#11161d', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
-          <div style={{ width: `${Math.min(100, (totalSitePower / 1350) * 100)}%`, background: totalSitePower > 900 ? 'var(--red)' : 'var(--yellow)', transition: 'width 0.5s ease' }} />
-        </div>
-        <span style={{ fontWeight: 700 }}>{totalSitePower.toFixed(1)} / 1350.0 kW</span>
       </div>
 
       <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden', display: 'grid', gridTemplateColumns: inspected ? '1fr 340px' : '1fr', gap: '0px' }}>

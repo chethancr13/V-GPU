@@ -6,10 +6,8 @@ function WaterComputePlanner() {
   const [isConnected, setIsConnected] = useState(false)
 
   // 3D Visualizer States
-  const [rotationAngle, setRotationAngle] = useState(45)
-  const [dragStart, setDragStart] = useState(null)
-  const [viewMode, setViewMode] = useState('3D') // '3D' or 'PLAN'
-  const [activePipeType, setActivePipeType] = useState('ALL') // 'ALL', 'WATER', 'NETWORK'
+  const [activePipeType, setActivePipeType] = useState('ALL') // 'ALL', 'WATER', 'POWER'
+
 
   // Model & Estimator States
   const [modelSizeBillion, setModelSizeBillion] = useState(70) // 1B - 175B
@@ -19,7 +17,6 @@ function WaterComputePlanner() {
 
   // Cooling efficiency options (influences WUE)
   const [wueOptimized, setWueOptimized] = useState(true)
-  const [displayLayer, setDisplayLayer] = useState('COMBINED') // 'COMBINED', 'SERVERS', 'PIPELINES'
 
   // Power & Backup system states
   const [genActive, setGenActive] = useState(false)
@@ -45,28 +42,7 @@ function WaterComputePlanner() {
     return () => clearInterval(interval)
   }, [genActive, batteryCharging])
 
-  // Helper opacities for different layer highlights
-  const getPipelineOpacity = () => {
-    if (displayLayer === 'SERVERS') return 0.08;
-    return 1.0;
-  }
 
-  const getServerOpacity = (obj) => {
-    if (displayLayer === 'PIPELINES') {
-      return obj.type === 'chiller' || obj.type === 'pump' || obj.type === 'scheduler' ? 0.35 : 0.08;
-    }
-    return 1.0;
-  }
-
-  // Default server layout for 3D visualizer
-  const [serversList] = useState([
-    { id: 'rack-gpu-0', name: 'GPU-HOST-01', x: 2, y: 2, type: 'gpu', label: 'ALPHA HOST' },
-    { id: 'rack-gpu-1', name: 'GPU-HOST-02', x: 5, y: 2, type: 'gpu', label: 'BETA HOST' },
-    { id: 'rack-scheduler', name: 'TASK SCHEDULER', x: 2, y: 5, type: 'scheduler', label: 'CONTROL CORE' },
-    { id: 'rack-storage', name: 'NVMe ARRAY', x: 5, y: 5, type: 'storage', label: 'BLOCK STG' },
-    { id: 'cooling-chiller', name: 'Cooling Loop Chiller', x: 3, y: 0, type: 'chiller', label: 'MAIN CHILLER' },
-    { id: 'cooling-pump', name: 'Coolant Pump', x: 4, y: 0, type: 'pump', label: 'PRIMARY PUMP' }
-  ])
 
   // WebSocket connection for real-time baseline values
   useEffect(() => {
@@ -85,22 +61,7 @@ function WaterComputePlanner() {
     return () => ws.close()
   }, [])
 
-  // Drag rotation handlers
-  const handleMouseDown = (e) => {
-    setDragStart({ x: e.clientX, angle: rotationAngle })
-  }
 
-  const handleMouseMove = (e) => {
-    if (!dragStart) return
-    const deltaX = e.clientX - dragStart.x
-    let newAngle = (dragStart.angle + deltaX * 0.45) % 360
-    if (newAngle < 0) newAngle += 360
-    setRotationAngle(newAngle)
-  }
-
-  const handleMouseUp = () => {
-    setDragStart(null)
-  }
 
   // Math: Water Telemetry calculations
   const totalPowerKW = ((data?.physical_gpus?.reduce((acc, g) => acc + g.power_draw, 0) || 120) + 180) / 1000.0 // kW
@@ -154,147 +115,218 @@ function WaterComputePlanner() {
 
   const scalingData = [1, 2, 4, 8, 16, 32, 64].map(nodes => getSpeedupAndEfficiency(nodes))
 
-  // Coordinate Projection Equations
-  const spacingX = 35
-  const spacingY = 17.5
-  const cabinetHeight = 55
-  const centerX = 440
-  const centerY = 140
-
-  const getIsoCoordinates = (x, y) => {
-    const theta = rotationAngle * Math.PI / 180
-    const dx = x - 3.5
-    const dy = y - 3.5
-    const rx = dx * Math.cos(theta) - dy * Math.sin(theta)
-    const ry = dx * Math.sin(theta) + dy * Math.cos(theta)
-    
-    const isoX = (rx - ry) * spacingX + centerX
-    const isoY = (rx + ry) * spacingY + centerY
-    return { x: isoX, y: isoY }
+  // Helper to render a cooling tower
+  const renderCoolingTower = (tx, ty) => {
+    return (
+      <g key={`tower-${tx}-${ty}`}>
+        {/* Base shadow */}
+        <ellipse cx={tx} cy={ty} rx={22} ry={11} fill="black" opacity="0.3" />
+        {/* Tower body */}
+        <path
+          d={`M ${tx - 20} ${ty} 
+              Q ${tx - 15} ${ty - 25} ${tx - 11} ${ty - 45} 
+              L ${tx + 11} ${ty - 45} 
+              Q ${tx + 15} ${ty - 25} ${tx + 20} ${ty} Z`}
+          fill="url(#towerGradient)"
+          stroke="#1b2430"
+          strokeWidth="0.8"
+        />
+        {/* Top Lip */}
+        <ellipse cx={tx} cy={ty - 45} rx={11} ry={5.5} fill="#11161f" stroke="#253243" strokeWidth="0.8" />
+        {/* Bottom air intake slots */}
+        <ellipse cx={tx} cy={ty - 2} rx={19} ry={9.5} fill="none" stroke="#0e131a" strokeWidth="3" strokeDasharray="3,2" />
+        {/* Steam rising particles */}
+        <circle cx={tx - 4} cy={ty - 48} r={4} className="steam-cloud" style={{ animationDelay: '0s' }} />
+        <circle cx={tx + 4} cy={ty - 52} r={5} className="steam-cloud" style={{ animationDelay: '1.2s' }} />
+        <circle cx={tx} cy={ty - 55} r={3} className="steam-cloud" style={{ animationDelay: '2.5s' }} />
+      </g>
+    )
   }
 
-  const getBoxVertices = (x, y) => {
-    const p1 = getIsoCoordinates(x, y)
-    const p2 = getIsoCoordinates(x + 1, y)
-    const p3 = getIsoCoordinates(x + 1, y + 1)
-    const p4 = getIsoCoordinates(x, y + 1)
-    
-    const corners = [p1, p2, p3, p4]
-    const vL = corners.reduce((min, p) => p.x < min.x ? p : min, corners[0])
-    const vR = corners.reduce((max, p) => p.x > max.x ? p : max, corners[0])
-    const vT = corners.reduce((min, p) => p.y < min.y ? p : min, corners[0])
-    const vB = corners.reduce((max, p) => p.y > max.y ? p : max, corners[0])
-    
-    return { vL, vR, vT, vB }
+  // Helper to render a storage tank
+  const renderStorageTank = (tx, ty) => {
+    return (
+      <g key={`tank-${tx}-${ty}`}>
+        {/* Tank Shadow */}
+        <ellipse cx={tx} cy={ty} rx={14} ry={7} fill="black" opacity="0.3" />
+        {/* Cylindrical body */}
+        <path
+          d={`M ${tx - 12} ${ty} 
+              L ${tx - 12} ${ty - 30} 
+              A 12 6 0 0 1 ${tx + 12} ${ty - 30} 
+              L ${tx + 12} ${ty} Z`}
+          fill="url(#tankGradient)"
+          stroke="#1d2633"
+          strokeWidth="0.8"
+        />
+        {/* Top Dome */}
+        <path
+          d={`M ${tx - 12} ${ty - 30} 
+              A 12 10 0 0 1 ${tx + 12} ${ty - 30} Z`}
+          fill="#314052"
+          stroke="#1d2633"
+          strokeWidth="0.8"
+        />
+      </g>
+    )
   }
 
-  const sortedTiles = []
-  for (let x = 0; x < 8; x++) {
-    for (let y = 0; y < 8; y++) {
-      sortedTiles.push({ x, y, depthY: getIsoCoordinates(x, y).y })
-    }
+  // Helper to render a server rack
+  const renderServerRack = (rx, ry, id) => {
+    const h = 32; // height
+    const w = 10; // width along left-down axis
+    const d = 16; // depth along right-down axis
+    
+    // Top face corners
+    const t1 = { x: rx, y: ry - h }
+    const t2 = { x: rx - w, y: ry - h + w*0.5 }
+    const t3 = { x: rx - w + d, y: ry - h + w*0.5 + d*0.5 }
+    const t4 = { x: rx + d, y: ry - h + d*0.5 }
+    
+    // Bottom face corners
+    const b2 = { x: rx - w, y: ry + w*0.5 }
+    const b3 = { x: rx - w + d, y: ry + w*0.5 + d*0.5 }
+    const b4 = { x: rx + d, y: ry + d*0.5 }
+    
+    return (
+      <g key={`rack-${id}`}>
+        <polygon points={`${rx},${ry} ${rx-w},${ry+w*0.5} ${rx-w+d},${ry+w*0.5+d*0.5} ${rx+d},${ry+d*0.5}`} fill="black" opacity="0.35" />
+        <polygon points={`${t2.x},${t2.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b2.x},${b2.y}`} fill="#161f28" stroke="#253545" strokeWidth="0.5" />
+        <polygon points={`${t4.x},${t4.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b4.x},${b4.y}`} fill="#0f1620" stroke="#253545" strokeWidth="0.5" />
+        <polygon points={`${t1.x},${t1.y} ${t2.x},${t2.y} ${t3.x},${t3.y} ${t4.x},${t4.y}`} fill="#253344" stroke="#374b63" strokeWidth="0.5" />
+        
+        {Array.from({ length: 6 }).map((_, idx) => {
+          const ly = t4.y + (idx + 1) * (h / 7);
+          const lx1 = t4.x - (t4.x - t3.x) * 0.2;
+          const ly1 = t4.y + (idx + 1) * (h / 7) + (t3.y - t4.y) * 0.2;
+          const lx2 = t4.x - (t4.x - t3.x) * 0.8;
+          const ly2 = t4.y + (idx + 1) * (h / 7) + (t3.y - t4.y) * 0.8;
+          const ledColor = idx % 2 === 0 ? '#00f2fe' : '#09f';
+          return (
+            <line
+              key={idx}
+              x1={lx1}
+              y1={ly - idx * 0.5 + 2}
+              x2={lx2}
+              y2={ly - idx * 0.5 + 4}
+              stroke={ledColor}
+              strokeWidth="1.2"
+              opacity="0.85"
+              filter="url(#glow)"
+            />
+          )
+        })}
+      </g>
+    )
   }
-  sortedTiles.sort((a, b) => a.depthY - b.depthY)
 
-  const sortedCabinets = serversList.map(o => ({
-    ...o,
-    depthY: getIsoCoordinates(o.x, o.y).y
-  }))
-  sortedCabinets.sort((a, b) => a.depthY - b.depthY)
+  // Helper to render a clarifying tank
+  const renderClarifierTank = (cx, cy, id) => {
+    return (
+      <g key={`clarifier-${id}`}>
+        <ellipse cx={cx} cy={cy + 4} rx={32} ry={16} fill="black" opacity="0.3" />
+        <path
+          d={`M ${cx - 30} ${cy} 
+              L ${cx - 30} ${cy + 8} 
+              A 30 15 0 0 0 ${cx + 30} ${cy + 8} 
+              L ${cx + 30} ${cy} Z`}
+          fill="#2c3540"
+          stroke="#1d2633"
+          strokeWidth="0.8"
+        />
+        <ellipse cx={cx} cy={cy} rx={30} ry={15} fill="#1f2730" stroke="#3b4856" strokeWidth="1" />
+        <ellipse cx={cx} cy={cy} rx={27} ry={13.5} fill="#14a3b8" opacity="0.75" />
+        <ellipse cx={cx} cy={cy} rx={22} ry={11} fill="none" stroke="#22d3ee" strokeWidth="0.5" opacity="0.5" />
+        <ellipse cx={cx} cy={cy} rx={4} ry={2} fill="#718096" stroke="#4a5568" strokeWidth="0.5" />
+        <path d={`M ${cx - 1} ${cy} L ${cx - 1} ${cy - 4} A 1 0.5 0 0 1 ${cx + 1} ${cy - 4} L ${cx + 1} ${cy} Z`} fill="#718096" />
+        <g transform={`translate(${cx}, ${cy}) scale(1, 0.5)`}>
+          <line
+            x1="0"
+            y1="0"
+            x2="27"
+            y2="0"
+            stroke="#e2e8f0"
+            strokeWidth="1.5"
+            className="scraper-bridge"
+            style={{ filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.5))' }}
+          />
+        </g>
+      </g>
+    )
+  }
 
   return (
     <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', background: '#070b0e', minHeight: '100%', color: '#c9d1d9' }}>
       
       {/* Styles for animated flow pipelines */}
       <style>{`
-        @keyframes water-flow-cold {
-          to { stroke-dashoffset: -30; }
+        @keyframes steam-rise {
+          0% {
+            transform: translateY(0) scale(0.6);
+            opacity: 0;
+          }
+          20% {
+            opacity: 0.45;
+          }
+          100% {
+            transform: translateY(-35px) scale(1.3);
+            opacity: 0;
+          }
         }
-        @keyframes water-flow-hot {
-          to { stroke-dashoffset: 30; }
+        @keyframes rotate-scraper {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
-        @keyframes network-activity {
-          to { stroke-dashoffset: -40; }
+        @keyframes flow-dots {
+          to {
+            stroke-dashoffset: -40;
+          }
         }
-        .water-cold-pipe {
+        .steam-cloud {
+          animation: steam-rise 3.5s ease-out infinite;
+          fill: rgba(224, 242, 254, 0.45);
+          filter: blur(1.5px);
+        }
+        .scraper-bridge {
+          animation: rotate-scraper 24s linear infinite;
+          transform-origin: 0px 0px;
+        }
+        .flow-line {
           stroke-dasharray: 6, 4;
-          animation: water-flow-cold 1s linear infinite;
+          animation: flow-dots 2s linear infinite;
         }
-        .water-hot-pipe {
+        .flow-line-fast {
+          stroke-dasharray: 5, 3;
+          animation: flow-dots 1.2s linear infinite;
+        }
+        .flow-line-reverse {
           stroke-dasharray: 6, 4;
-          animation: water-flow-hot 1.2s linear infinite;
-        }
-        .network-link-pipe {
-          stroke-dasharray: 5, 5;
-          animation: network-activity 0.8s linear infinite;
+          animation: flow-dots 2s linear infinite;
+          animation-direction: reverse;
         }
         .flow-btn-active {
-          background: rgba(118, 185, 0, 0.2);
-          border: 1px solid var(--accent);
-          color: var(--accent);
+          background: rgba(6, 182, 212, 0.25);
+          border: 1px solid #06b6d4;
+          color: #00f2fe;
         }
         .flow-btn-inactive {
-          background: var(--gray);
-          border: 1px solid var(--border);
+          background: #111820;
+          border: 1px solid rgba(255,255,255,0.08);
+          color: #8b949e;
+        }
+        .flow-btn-inactive:hover {
           color: #fff;
+          border-color: rgba(255,255,255,0.2);
         }
       `}</style>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.75rem' }}>
         <div>
-          <span style={{ fontSize: '0.65rem', color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.05em' }}>ENVIRONMENTAL & RESOURCE PLANNING CONTROL</span>
+          <span style={{ fontSize: '0.65rem', color: '#06b6d4', fontWeight: 800, letterSpacing: '0.05em' }}>ENVIRONMENTAL & RESOURCE PLANNING CONTROL</span>
           <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', margin: 0 }}>Water Consumption & Parallel Compute Planner</h2>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {/* Display Layer Selector (Segmented buttons) */}
-          <div style={{ display: 'flex', background: 'var(--gray)', padding: '2px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-            {[
-              { id: 'COMBINED', name: 'Combined', icon: Layers },
-              { id: 'SERVERS', name: 'Hardware', icon: Server },
-              { id: 'PIPELINES', name: 'Pipelines', icon: Network }
-            ].map(layer => {
-              const Icon = layer.icon;
-              const isSelected = displayLayer === layer.id;
-              return (
-                <button
-                  key={layer.id}
-                  onClick={() => setDisplayLayer(layer.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    padding: '0.35rem 0.75rem',
-                    borderRadius: '3px',
-                    border: 'none',
-                    background: isSelected ? 'rgba(118, 185, 0, 0.15)' : 'transparent',
-                    color: isSelected ? 'var(--accent)' : 'var(--text-secondary)',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s'
-                  }}
-                  onMouseEnter={e => {
-                    if (!isSelected) e.currentTarget.style.color = '#fff';
-                  }}
-                  onMouseLeave={e => {
-                    if (!isSelected) e.currentTarget.style.color = 'var(--text-secondary)';
-                  }}
-                >
-                  <Icon size={12} />
-                  {layer.name}
-                </button>
-              );
-            })}
-          </div>
-
-          <button 
-            onClick={() => setViewMode(viewMode === '3D' ? 'PLAN' : '3D')}
-            style={{ padding: '0.35rem 0.75rem', background: 'var(--gray)', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', color: '#fff' }}
-          >
-            VIEW: {viewMode}
-          </button>
-          
           <button 
             onClick={() => setWueOptimized(!wueOptimized)}
             style={{ padding: '0.35rem 0.75rem', background: wueOptimized ? 'rgba(6, 182, 212, 0.2)' : 'var(--gray)', border: wueOptimized ? '1px solid #06b6d4' : '1px solid var(--border)', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', color: wueOptimized ? '#06b6d4' : '#fff' }}
@@ -309,28 +341,28 @@ function WaterComputePlanner() {
         
         {/* 3D Visualizer Room */}
         <div 
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
           style={{ 
             position: 'relative', 
-            height: '350px', 
+            height: '380px', 
             background: '#0e141a', 
-            border: '1px solid rgba(255,255,255,0.05)', 
+            border: '1px solid rgba(255,255,255,0.08)', 
             borderRadius: '8px', 
             overflow: 'hidden',
-            cursor: dragStart ? 'grabbing' : 'grab',
             userSelect: 'none'
           }}
         >
+          {/* Sustainability Pill Badge */}
+          <div style={{ position: 'absolute', top: '1rem', left: '1.25rem', background: '#fff', color: '#07121b', padding: '0.25rem 0.75rem', borderRadius: '15px', fontSize: '0.55rem', fontWeight: 900, letterSpacing: '0.08em', zIndex: 10 }}>
+            SUSTAINABILITY
+          </div>
+
           {/* Overlay Filter Buttons */}
-          <div style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', display: 'flex', gap: '0.35rem', zIndex: 10 }}>
-            {['ALL', 'WATER', 'NETWORK'].map(t => (
+          <div style={{ position: 'absolute', top: '1rem', right: '1.25rem', display: 'flex', gap: '0.4rem', zIndex: 10 }}>
+            {['ALL', 'WATER', 'POWER'].map(t => (
               <button 
                 key={t}
                 onClick={() => setActivePipeType(t)}
-                style={{ padding: '0.25rem 0.5rem', borderRadius: '3px', fontSize: '0.55rem', fontWeight: 800, cursor: 'pointer' }}
+                style={{ padding: '0.3rem 0.65rem', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.15s' }}
                 className={activePipeType === t ? 'flow-btn-active' : 'flow-btn-inactive'}
               >
                 {t} FLOWS
@@ -338,179 +370,221 @@ function WaterComputePlanner() {
             ))}
           </div>
 
-          <div style={{ position: 'absolute', top: '0.75rem', left: '1rem', fontSize: '0.6rem', color: 'var(--text-muted)' }}>
-            <span> 3D COOLANT LOOPS & DATA BACKBONES</span>
-          </div>
+          <svg style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} viewBox="0 0 850 500">
+            <defs>
+              <filter id="shadow-blur" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="8" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
 
-          <svg style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}>
-            
-            {/* Draw Floor Tiles */}
-            {sortedTiles.map(tile => {
-              const { x: isoX, y: isoY } = getIsoCoordinates(tile.x, tile.y)
-              return (
-                <polygon
-                  key={`tile-${tile.x}-${tile.y}`}
-                  points={`${isoX},${isoY} ${isoX + spacingX},${isoY + spacingY} ${isoX},${isoY + 2*spacingY} ${isoX - spacingX},${isoY + spacingY}`}
-                  fill="#11161d"
-                  stroke="#1b222d"
-                  strokeWidth="0.8"
+              <linearGradient id="towerGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#2c3746" />
+                <stop offset="35%" stopColor="#45546b" />
+                <stop offset="75%" stopColor="#2c3746" />
+                <stop offset="100%" stopColor="#1a222c" />
+              </linearGradient>
+
+              <linearGradient id="tankGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#1b323c" />
+                <stop offset="40%" stopColor="#2c5364" />
+                <stop offset="80%" stopColor="#1b323c" />
+                <stop offset="100%" stopColor="#0f2027" />
+              </linearGradient>
+
+              <marker id="arrow-cyan" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#00f2fe" />
+              </marker>
+              <marker id="arrow-yellow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#eab308" />
+              </marker>
+              <marker id="arrow-pink" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#f43f5e" />
+              </marker>
+              <marker id="arrow-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#3b82f6" />
+              </marker>
+              <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#10b981" />
+              </marker>
+            </defs>
+
+            <g style={{
+              transform: 'translate(-30px, -26px) scale(0.85)'
+            }}>
+              {/* FLOW PIPELINES / LINKS */}
+              {/* 1. Water Treatment -> Power Plant (Cyan - Dotted) */}
+              {(activePipeType === 'ALL' || activePipeType === 'WATER') && (
+                <path
+                  d="M 640 210 L 510 145 L 430 185"
+                  fill="none"
+                  stroke="#00f2fe"
+                  strokeWidth="2.5"
+                  className="flow-line"
+                  markerEnd="url(#arrow-cyan)"
+                  filter="url(#glow)"
                 />
-              )
-            })}
+              )}
 
-            {/* COOLANT PIPE LINES (Liquid Flow Paths) */}
-            {(activePipeType === 'ALL' || activePipeType === 'WATER') && (
-              <g style={{ opacity: getPipelineOpacity(), transition: 'opacity 0.25s' }}>
-                {/* Cold water pipe running from Pump (4,0) to compute hosts (2,2) and (5,2) */}
-                <path 
-                  d={`M ${getIsoCoordinates(3, 0).x} ${getIsoCoordinates(3, 0).y + spacingY} 
-                      L ${getIsoCoordinates(3, 2).x} ${getIsoCoordinates(3, 2).y + spacingY} 
-                      L ${getIsoCoordinates(2, 2).x + spacingX / 2} ${getIsoCoordinates(2, 2).y + spacingY}`}
-                  fill="none" 
-                  stroke="#06b6d4" 
-                  strokeWidth="3.5" 
-                  className="water-cold-pipe" 
-                />
-                <path 
-                  d={`M ${getIsoCoordinates(3, 2).x} ${getIsoCoordinates(3, 2).y + spacingY} 
-                      L ${getIsoCoordinates(5, 2).x - spacingX / 2} ${getIsoCoordinates(5, 2).y + spacingY}`}
-                  fill="none" 
-                  stroke="#06b6d4" 
-                  strokeWidth="3.5" 
-                  className="water-cold-pipe" 
-                />
-
-                {/* Hot water pipe running from compute hosts back to Chiller (3,0) */}
-                <path 
-                  d={`M ${getIsoCoordinates(2, 2).x} ${getIsoCoordinates(2, 2).y + spacingY * 1.5} 
-                      L ${getIsoCoordinates(2, 3).x} ${getIsoCoordinates(2, 3).y}
-                      L ${getIsoCoordinates(4, 3).x} ${getIsoCoordinates(4, 3).y}
-                      L ${getIsoCoordinates(4, 0).x} ${getIsoCoordinates(4, 0).y + spacingY}`}
-                  fill="none" 
-                  stroke="#ef4444" 
-                  strokeWidth="3.5" 
-                  className="water-hot-pipe" 
-                />
-                <path 
-                  d={`M ${getIsoCoordinates(5, 2).x} ${getIsoCoordinates(5, 2).y + spacingY * 1.5} 
-                      L ${getIsoCoordinates(5, 3).x} ${getIsoCoordinates(5, 3).y}
-                      L ${getIsoCoordinates(4, 3).x} ${getIsoCoordinates(4, 3).y}`}
-                  fill="none" 
-                  stroke="#ef4444" 
-                  strokeWidth="3.5" 
-                  className="water-hot-pipe" 
-                />
-              </g>
-            )}
-
-            {/* NETWORK DATA BACKBONE LINES */}
-            {(activePipeType === 'ALL' || activePipeType === 'NETWORK') && (
-              <g style={{ opacity: getPipelineOpacity(), transition: 'opacity 0.25s' }}>
-                {/* Network bus lines connecting compute/storage to scheduler control node */}
-                <path 
-                  d={`M ${getIsoCoordinates(2, 5).x} ${getIsoCoordinates(2, 5).y + spacingY} 
-                      L ${getIsoCoordinates(2, 2).x} ${getIsoCoordinates(2, 2).y + spacingY * 1.5}`}
-                  fill="none" 
-                  stroke="#eab308" 
-                  strokeWidth="2.5" 
-                  className="network-link-pipe" 
-                />
-                <path 
-                  d={`M ${getIsoCoordinates(2, 5).x} ${getIsoCoordinates(2, 5).y + spacingY} 
-                      L ${getIsoCoordinates(5, 2).x} ${getIsoCoordinates(5, 2).y + spacingY * 1.5}`}
-                  fill="none" 
-                  stroke="#eab308" 
-                  strokeWidth="2.5" 
-                  className="network-link-pipe" 
-                />
-                <path 
-                  d={`M ${getIsoCoordinates(2, 5).x} ${getIsoCoordinates(2, 5).y + spacingY} 
-                      L ${getIsoCoordinates(5, 5).x} ${getIsoCoordinates(5, 5).y + spacingY}`}
-                  fill="none" 
-                  stroke="#eab308" 
-                  strokeWidth="2.5" 
-                  className="network-link-pipe" 
-                />
-              </g>
-            )}
-
-            {/* Draw 3D Cabinets and Chillers */}
-            {viewMode === '3D' ? (
-              sortedCabinets.map(obj => {
-                const { vL, vR, vT, vB } = getBoxVertices(obj.x, obj.y)
-                const H = obj.type === 'chiller' || obj.type === 'pump' ? 35 : cabinetHeight
-                
-                const tvL = { x: vL.x, y: vL.y - H }
-                const tvR = { x: vR.x, y: vR.y - H }
-                const tvT = { x: vT.x, y: vT.y - H }
-                const tvB = { x: vB.x, y: vB.y - H }
-
-                let fillFace = 'rgba(26, 38, 51, 0.75)'
-                let strokeFace = '#2c3e50'
-                let glowColor = 'var(--accent)'
-
-                if (obj.type === 'chiller') {
-                  fillFace = 'rgba(6, 182, 212, 0.65)'
-                  strokeFace = '#06b6d4'
-                  glowColor = '#06b6d4'
-                } else if (obj.type === 'pump') {
-                  fillFace = 'rgba(59, 130, 246, 0.65)'
-                  strokeFace = '#3b82f6'
-                  glowColor = '#3b82f6'
-                } else if (obj.type === 'gpu') {
-                  fillFace = 'rgba(16, 185, 129, 0.6)'
-                  strokeFace = '#10b981'
-                  glowColor = '#10b981'
-                } else if (obj.type === 'storage') {
-                  fillFace = 'rgba(245, 158, 11, 0.55)'
-                  strokeFace = '#f59e0b'
-                  glowColor = '#f59e0b'
-                } else {
-                  fillFace = 'rgba(168, 85, 247, 0.55)'
-                  strokeFace = '#a855f7'
-                  glowColor = '#a855f7'
-                }
-
-                return (
-                  <g key={obj.id} style={{ opacity: getServerOpacity(obj), transition: 'opacity 0.25s' }}>
-                    {/* Shadow base */}
-                    <polygon points={`${vL.x},${vL.y} ${vB.x},${vB.y} ${tvB.x},${tvB.y} ${tvL.x},${tvL.y}`} fill={fillFace} stroke={strokeFace} strokeWidth="1" />
-                    <polygon points={`${vR.x},${vR.y} ${vB.x},${vB.y} ${tvB.x},${tvB.y} ${tvR.x},${tvR.y}`} fill={fillFace} stroke={strokeFace} strokeWidth="1" />
-                    <polygon points={`${tvL.x},${tvL.y} ${tvT.x},${tvT.y} ${tvR.x},${tvR.y} ${tvB.x},${tvB.y}`} fill={fillFace} stroke={strokeFace} strokeWidth="1" />
-                    
-                    {/* Visual details on server face */}
-                    {obj.type !== 'chiller' && obj.type !== 'pump' && (
-                      <>
-                        <line x1={vB.x + (vR.x - vB.x)*0.3} y1={vB.y + (vR.y - vB.y)*0.3 - H*0.3} x2={vB.x + (vR.x - vB.x)*0.7} y2={vB.y + (vR.y - vB.y)*0.7 - H*0.3} stroke={glowColor} strokeWidth="2" />
-                        <line x1={vB.x + (vR.x - vB.x)*0.3} y1={vB.y + (vR.y - vB.y)*0.3 - H*0.6} x2={vB.x + (vR.x - vB.x)*0.7} y2={vB.y + (vR.y - vB.y)*0.7 - H*0.6} stroke={glowColor} strokeWidth="2" />
-                      </>
-                    )}
-                  </g>
-                )
-              })
-            ) : (
-              // Plan View polygons
-              sortedCabinets.map(obj => {
-                const { vL, vR, vT, vB } = getBoxVertices(obj.x, obj.y)
-                let blockColor = '#475569'
-                if (obj.type === 'chiller' || obj.type === 'pump') blockColor = '#06b6d4'
-                else if (obj.type === 'gpu') blockColor = 'var(--accent)'
-                else if (obj.type === 'storage') blockColor = '#f59e0b'
-                else blockColor = '#a855f7'
-
-                return (
-                  <polygon
-                    key={obj.id}
-                    points={`${vL.x},${vL.y} ${vT.x},${vT.y} ${vR.x},${vR.y} ${vB.x},${vB.y}`}
-                    fill={blockColor}
-                    stroke="#fff"
-                    strokeWidth="0.5"
-                    style={{ opacity: getServerOpacity(obj) * 0.8, transition: 'opacity 0.25s' }}
+              {/* 2. Water Treatment -> Datacenter (Cyan - Dotted Double Lines) */}
+              {(activePipeType === 'ALL' || activePipeType === 'WATER') && (
+                <>
+                  <path
+                    d="M 650 230 L 590 195 L 530 225 L 530 280 L 570 300 L 590 320"
+                    fill="none"
+                    stroke="#00f2fe"
+                    strokeWidth="2"
+                    className="flow-line"
+                    markerEnd="url(#arrow-cyan)"
+                    filter="url(#glow)"
                   />
-                )
-              })
-            )}
+                  <path
+                    d="M 660 240 L 610 215 L 545 247 L 545 292 L 580 310 L 598 328"
+                    fill="none"
+                    stroke="#00f2fe"
+                    strokeWidth="2"
+                    className="flow-line-fast"
+                    markerEnd="url(#arrow-cyan)"
+                    filter="url(#glow)"
+                  />
+                </>
+              )}
 
+              {/* 3. Power Plant -> Wastewater Treatment (Pink/Red - Dotted) */}
+              {(activePipeType === 'ALL' || activePipeType === 'WATER') && (
+                <path
+                  d="M 320 195 L 260 225 L 340 345 L 390 370 L 390 410"
+                  fill="none"
+                  stroke="#f43f5e"
+                  strokeWidth="2.5"
+                  className="flow-line-reverse"
+                  markerEnd="url(#arrow-pink)"
+                  filter="url(#glow)"
+                />
+              )}
+
+              {/* 4. Power Plant -> Datacenter (Yellow - Electric Power) */}
+              {(activePipeType === 'ALL' || activePipeType === 'POWER') && (
+                <path
+                  d="M 420 210 L 520 260 L 560 280 L 560 315"
+                  fill="none"
+                  stroke="#eab308"
+                  strokeWidth="2.5"
+                  className="flow-line-fast"
+                  markerEnd="url(#arrow-yellow)"
+                  filter="url(#glow)"
+                />
+              )}
+
+              {/* 5. Datacenter -> Wastewater (Blue/Grey - Blowdown) */}
+              {(activePipeType === 'ALL' || activePipeType === 'WATER') && (
+                <path
+                  d="M 530 380 L 460 415"
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="2.5"
+                  className="flow-line"
+                  markerEnd="url(#arrow-blue)"
+                  filter="url(#glow)"
+                />
+              )}
+
+              {/* 6. Wastewater -> Datacenter (Green - Reclaimed/Recycled Water) */}
+              {(activePipeType === 'ALL' || activePipeType === 'WATER') && (
+                <path
+                  d="M 490 435 L 550 405"
+                  fill="none"
+                  stroke="#10b981"
+                  strokeWidth="2.5"
+                  className="flow-line-reverse"
+                  markerEnd="url(#arrow-green)"
+                  filter="url(#glow)"
+                />
+              )}
+
+              {/* ================= PLATFORMS & COMPONENTS ================= */}
+
+              {/* --- Wastewater Treatment Plant Platform --- */}
+              <g>
+                {/* Shadow */}
+                <ellipse cx="440" cy="460" rx="110" ry="60" fill="black" opacity="0.4" filter="url(#shadow-blur)" />
+                {/* 3D Slab */}
+                <polygon points="440,390  550,450  440,510  330,450" fill="#1b242f" stroke="#2b3b4d" strokeWidth="1" />
+                <polygon points="330,450  440,510  440,518  330,458" fill="#11171f" stroke="#2b3b4d" strokeWidth="1" />
+                <polygon points="550,450  440,510  440,518  550,458" fill="#0c1016" stroke="#2b3b4d" strokeWidth="1" />
+                {/* Contents */}
+                {renderClarifierTank(405, 435, 1)}
+                {renderClarifierTank(465, 465, 2)}
+                {/* Platform Label */}
+                <text x="440" y="524" textAnchor="middle" fill="#8b949e" fontSize="9px" fontWeight="700" letterSpacing="0.05em">WASTEWATER TREATMENT PLANT</text>
+              </g>
+
+              {/* --- Datacenter Platform --- */}
+              <g>
+                {/* Shadow */}
+                <ellipse cx="600" cy="370" rx="110" ry="60" fill="black" opacity="0.4" filter="url(#shadow-blur)" />
+                {/* 3D Slab */}
+                <polygon points="600,300  710,360  600,420  490,360" fill="#1b242f" stroke="#2b3b4d" strokeWidth="1" />
+                <polygon points="490,360  600,420  600,428  490,368" fill="#11171f" stroke="#2b3b4d" strokeWidth="1" />
+                <polygon points="710,360  600,420  600,428  710,368" fill="#0c1016" stroke="#2b3b4d" strokeWidth="1" />
+                {/* Contents - Server Racks */}
+                {/* Row 2 (back) */}
+                {renderServerRack(580, 325, 4)}
+                {renderServerRack(600, 335, 5)}
+                {renderServerRack(620, 345, 6)}
+                {/* Row 1 (front) */}
+                {renderServerRack(550, 340, 1)}
+                {renderServerRack(570, 350, 2)}
+                {renderServerRack(590, 360, 3)}
+                {/* Platform Label */}
+                <text x="600" y="434" textAnchor="middle" fill="#8b949e" fontSize="9px" fontWeight="700" letterSpacing="0.05em">DATACENTER</text>
+              </g>
+
+              {/* --- Water Treatment Plant Platform --- */}
+              <g>
+                {/* Shadow */}
+                <ellipse cx="700" cy="230" rx="100" ry="55" fill="black" opacity="0.4" filter="url(#shadow-blur)" />
+                {/* 3D Slab */}
+                <polygon points="700,165  800,220  700,275  600,220" fill="#1b242f" stroke="#2b3b4d" strokeWidth="1" />
+                <polygon points="600,220  700,275  700,283  600,228" fill="#11171f" stroke="#2b3b4d" strokeWidth="1" />
+                <polygon points="800,220  700,275  700,283  800,228" fill="#0c1016" stroke="#2b3b4d" strokeWidth="1" />
+                {/* Contents */}
+                {renderStorageTank(660, 205)}
+                {/* Pump/Machinery Boxes */}
+                <polygon points="710,210  740,195  725,187  695,202" fill="#06b6d4" opacity="0.8" stroke="#0891b2" strokeWidth="0.5" />
+                <polygon points="695,202  725,187  725,193  695,208" fill="#0891b2" stroke="#0891b2" strokeWidth="0.5" />
+                <polygon points="710,210  725,187  725,193  710,216" fill="#0e131a" stroke="#0891b2" strokeWidth="0.5" />
+
+                <polygon points="730,225  760,210  745,202  715,217" fill="#22d3ee" opacity="0.85" stroke="#0891b2" strokeWidth="0.5" />
+                <polygon points="715,217  745,202  745,208  715,223" fill="#0891b2" stroke="#0891b2" strokeWidth="0.5" />
+                <polygon points="730,225  745,202  745,208  730,231" fill="#0e131a" stroke="#0891b2" strokeWidth="0.5" />
+                {/* Piping details */}
+                <path d="M 672 205 L 705 220" fill="none" stroke="#22d3ee" strokeWidth="2.5" />
+                {/* Platform Label */}
+                <text x="700" y="289" textAnchor="middle" fill="#8b949e" fontSize="9px" fontWeight="700" letterSpacing="0.05em">WATER TREATMENT PLANT</text>
+              </g>
+
+              {/* --- Power Plant Platform --- */}
+              <g>
+                {/* Shadow */}
+                <ellipse cx="370" cy="190" rx="100" ry="55" fill="black" opacity="0.4" filter="url(#shadow-blur)" />
+                {/* 3D Slab */}
+                <polygon points="370,125  470,180  370,235  270,180" fill="#1b242f" stroke="#2b3b4d" strokeWidth="1" />
+                <polygon points="270,180  370,235  370,243  270,188" fill="#11171f" stroke="#2b3b4d" strokeWidth="1" />
+                <polygon points="470,180  370,235  370,243  470,188" fill="#0c1016" stroke="#2b3b4d" strokeWidth="1" />
+                {/* Contents */}
+                {renderCoolingTower(335, 175)}
+                {renderCoolingTower(385, 200)}
+                {/* Platform Label */}
+                <text x="370" y="249" textAnchor="middle" fill="#8b949e" fontSize="9px" fontWeight="700" letterSpacing="0.05em">POWER PLANT</text>
+              </g>
+            </g>
           </svg>
         </div>
 
