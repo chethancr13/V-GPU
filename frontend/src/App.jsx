@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Server, Box, GitCompare,
   Image as ImageIcon, FileText, Settings,
   HelpCircle, Bell, Search, Cpu as CpuIcon, Activity, Network, Droplet,
-  Sun, Moon, Monitor, Bot, Layers
+  Sun, Moon, Monitor, Bot, Layers, Zap
 } from 'lucide-react'
 
 // Dashboard is eagerly loaded (visible on startup)
@@ -26,6 +26,7 @@ const Logs = lazy(() => import('./components/Logs'))
 const AIComparisonAgent = lazy(() => import('./components/AIComparisonAgent'))
 const ProjectAIChatbot = lazy(() => import('./components/ProjectAIChatbot'))
 const VirtualizationTopology = lazy(() => import('./components/VirtualizationTopology'))
+const BoltAccelerator3D = lazy(() => import('./components/BoltAccelerator3D'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,6 +82,7 @@ function App() {
       import('./components/Logs')
       import('./components/ProjectAIChatbot')
       import('./components/VirtualizationTopology')
+      import('./components/BoltAccelerator3D')
     }
     if (typeof window !== 'undefined') {
       if ('requestIdleCallback' in window) {
@@ -124,6 +126,7 @@ function App() {
   //  Navigation Tabs 
   const tabs = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, component: Dashboard },
+    { id: 'bolt_3d', name: '3D Accelerator Model', icon: Zap, component: BoltAccelerator3D },
     { id: 'vgpu', name: 'vGPU Manager', icon: Server, component: VGPUManager },
     { id: 'project_chatbot', name: 'Project AI Assistant', icon: Bot, component: ProjectAIChatbot },
     { id: 'gpu_monitor', name: 'GPU Monitor', icon: Activity, component: GPUMonitor },
