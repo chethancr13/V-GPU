@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useSharedMetrics } from '../contexts/MetricsContext'
+import { getCachedScripts, getCachedDatasets, invalidateScriptsCache, invalidateDatasetsCache } from '../api/cache'
 import { GitCompare, Play, RotateCcw, Cpu, Server, Database, Zap, Droplet, CheckCircle, ShieldAlert, BookOpen, Clock, Activity, Code, Terminal, FileCode } from 'lucide-react'
 
 function ComputeComparison() {
   const [data, setData] = useState(null)
-  const [isConnected, setIsConnected] = useState(false)
 
   // Dynamic scripts and datasets loaded from backend
   const [scriptsList, setScriptsList] = useState([])
@@ -45,28 +46,19 @@ function ComputeComparison() {
     colab: ''
   })
 
-  // WebSocket for live baseline data center metrics
+  // Shared WebSocket connection (replaces per-component WS)
+  const { metrics: wsMetrics, isConnected } = useSharedMetrics()
+
   useEffect(() => {
-    const wsUrl = 'ws://localhost:8000/ws/metrics'
-    const ws = new WebSocket(wsUrl)
-    ws.onopen = () => setIsConnected(true)
-    ws.onclose = () => setIsConnected(false)
-    ws.onmessage = (event) => {
-      try {
-        const metrics = JSON.parse(event.data)
-        setData(metrics)
-      } catch (e) {
-        console.error("WS error in Comparison:", e)
-      }
-    }
-    return () => ws.close()
-  }, [])
+    if (wsMetrics) setData(wsMetrics)
+  }, [wsMetrics])
+
 
   // Fetch ML models (scripts) and datasets dynamically from backend
   const fetchConfigs = () => {
     Promise.all([
-      fetch('http://localhost:8000/api/scripts').then(r => r.json()).catch(() => ({ scripts: [] })),
-      fetch('http://localhost:8000/api/datasets').then(r => r.json()).catch(() => ({ datasets: [] }))
+      getCachedScripts(),
+      getCachedDatasets()
     ]).then(([sRes, dRes]) => {
       const scripts = sRes.scripts && sRes.scripts.length > 0 ? sRes.scripts : ['start_dev.py']
       const datasets = dRes.datasets && dRes.datasets.length > 0 ? dRes.datasets : ['my_data.csv']
@@ -124,8 +116,9 @@ function ComputeComparison() {
         const res = await response.json()
         if (res.status === 'success') {
           // Refetch datasets list
-          const dRes = await fetch('http://localhost:8000/api/datasets').then(r => r.json())
-          setDatasetsList(dRes.datasets)
+          invalidateDatasetsCache()
+          const dRes = await getCachedDatasets(true)
+          setDatasetsList(dRes.datasets || [])
           setSelectedDataset(file.name)
         }
       } catch (err) {

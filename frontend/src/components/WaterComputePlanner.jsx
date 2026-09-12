@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useSharedMetrics } from '../contexts/MetricsContext'
 import { Droplet, Cpu, Activity, Zap, Info, Server, Network, Sliders, RefreshCw, BarChart2, ShieldAlert, Layers, Battery, Fuel, Power, Thermometer, Gauge } from 'lucide-react'
 
-function WaterComputePlanner() {
+function WaterComputePlanner({ isActive = true }) {
   const [data, setData] = useState(null)
-  const [isConnected, setIsConnected] = useState(false)
 
   // 3D Visualizer States
   const [activePipeType, setActivePipeType] = useState('ALL') // 'ALL', 'WATER', 'POWER'
@@ -27,7 +27,9 @@ function WaterComputePlanner() {
     batteryCharge: 78, batteryTemp: 32,
   })
 
+  // Simulated power telemetry — slowed from 2s to 4s to reduce re-renders
   useEffect(() => {
+    if (!isActive) return
     const interval = setInterval(() => {
       setPowerTel(prev => ({
         ...prev,
@@ -38,28 +40,18 @@ function WaterComputePlanner() {
         batteryCharge: batteryCharging ? Math.min(100, prev.batteryCharge + 0.1) : Math.max(20, prev.batteryCharge - 0.15),
         batteryTemp: prev.batteryTemp + (Math.random() - 0.5) * 0.3,
       }))
-    }, 2000)
+    }, 4000)
     return () => clearInterval(interval)
-  }, [genActive, batteryCharging])
+  }, [genActive, batteryCharging, isActive])
 
 
 
-  // WebSocket connection for real-time baseline values
+  // Shared WebSocket connection (replaces per-component WS)
+  const { metrics: wsMetrics, isConnected } = useSharedMetrics()
+
   useEffect(() => {
-    const wsUrl = 'ws://localhost:8000/ws/metrics'
-    const ws = new WebSocket(wsUrl)
-    ws.onopen = () => setIsConnected(true)
-    ws.onclose = () => setIsConnected(false)
-    ws.onmessage = (event) => {
-      try {
-        const metrics = JSON.parse(event.data)
-        setData(metrics)
-      } catch (e) {
-        console.error("WS error in Water Planner:", e)
-      }
-    }
-    return () => ws.close()
-  }, [])
+    if (wsMetrics) setData(wsMetrics)
+  }, [wsMetrics])
 
 
 

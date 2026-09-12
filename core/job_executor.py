@@ -32,8 +32,9 @@ class MLJobExecutor:
                 docker_client = temp_client
             except:
                 # --- ROBUST SIMULATION FALLBACK ---
+                # Reduced sleep from 2s to 0.5s — simulation doesn't need artificial latency
                 print(f" [Node {vgpu_id[:8]}] VM not found. Entering High-Fidelity Simulation Mode...")
-                await asyncio.sleep(2)
+                await asyncio.sleep(0.5)
                 acc = random.uniform(88, 99)
                 speed = random.uniform(200, 600)
                 loss = random.uniform(0.05, 0.2)
@@ -72,7 +73,7 @@ class MLJobExecutor:
             # For simplicity in this demo, if it's the 'test_script.py', we create it on the fly
             # Otherwise we try to run what the user provided.
             if script_name == "test_script.py":
-                create_cmd = f"python3 -c \"with open('/workspace/scripts/{script_name}', 'w') as f: f.write('import time, random, sys\\\\nprint(\\\\\\'Starting ML Job...\\\\\\')\\\\ntime.sleep(2)\\\\\\naccuracy = random.uniform(85, 99)\\\\\nspeed = random.uniform(100, 500)\\\\\nloss = random.uniform(0.1, 0.5)\\\\\nprint(f\\\\\\'Accuracy: {{accuracy}}%\\\\\\')\\\\nprint(f\\\\\\'Speed: {{speed}} samples/sec\\\\\\')\\\\nprint(f\\\\\\'Loss: {{loss}}\\\\\\' )\\\\nprint(f\\\\\\'Arguments: {{sys.argv[1:]}}\\\\\\' )')\""
+                create_cmd = f"python3 -c \"with open('/workspace/scripts/{script_name}', 'w') as f: f.write('import time, random, sys\\\\nprint(\\\\\\'Starting ML Job...\\\\\\')\\\\ntime.sleep(2)\\\\\\naccuracy = random.uniform(85, 99)\\\\nspeed = random.uniform(100, 500)\\\\nloss = random.uniform(0.1, 0.5)\\\\nprint(f\\\\\\'Accuracy: {{accuracy}}%\\\\\\')\\\\nprint(f\\\\\\'Speed: {{speed}} samples/sec\\\\\\')\\\\nprint(f\\\\\\'Loss: {{loss}}\\\\\\' )\\\\nprint(f\\\\\\'Arguments: {{sys.argv[1:]}}\\\\\\' )')\""
                 docker_client.api.exec_start(docker_client.api.exec_create(container_id, cmd=create_cmd)['Id'])
 
             cmd = ["python3", f"/workspace/scripts/{script_name}"]
@@ -82,7 +83,15 @@ class MLJobExecutor:
             # Additional parameters can be passed here
             
             exec_instance = docker_client.api.exec_create(container_id, cmd=cmd)
-            output = docker_client.api.exec_start(exec_instance['Id']).decode('utf-8')
+
+            # Run exec_start in a thread executor to avoid blocking the async event loop.
+            # Previously this was a synchronous blocking call that froze all concurrent
+            # operations (WebSocket metrics, scheduler, other jobs) until the script finished.
+            loop = asyncio.get_event_loop()
+            output = await loop.run_in_executor(
+                None,
+                lambda: docker_client.api.exec_start(exec_instance['Id']).decode('utf-8')
+            )
             
             # Parse metrics (improved regex for robustness)
             accuracy = self._extract_metric(output, r"Accuracy:\s*([\d.]+)")

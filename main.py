@@ -18,6 +18,7 @@ from core.job_executor import MLJobExecutor
 from core.chatbot.rag_engine import ProjectRAGEngine
 from core.chatbot.indexer import ProjectIndexer
 from core.chatbot.memory import ChatMemory
+from core.chatbot.metrics_collector import get_live_snapshot, format_metrics_for_prompt
 
 app = FastAPI(title="V-GPU NVIDIA Control Plane (Monolith)")
 
@@ -52,21 +53,25 @@ async def startup_event():
     asyncio.create_task(scheduler.process_queue())
 
     # Start the isolation manager's background enforcement loop
+    # Reduced from 1s to 5s — enforcement doesn't need 1Hz resolution
     async def enforce_limits_loop():
         while True:
             try:
                 isolation_manager.enforce_limits()
             except Exception as e:
                 print(f"Error enforcing limits: {e}")
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(5.0)
             
     asyncio.create_task(enforce_limits_loop())
 
     # Start initial project scanning & indexing in background
+    # Run in thread executor — scan_and_index() is CPU-bound synchronous code
+    # that would block the asyncio event loop if run directly in create_task
     async def initial_index_task():
         try:
             print(" [Startup] Scanning and indexing project files for RAG Assistant...")
-            stats = project_indexer.scan_and_index()
+            loop = asyncio.get_event_loop()
+            stats = await loop.run_in_executor(None, project_indexer.scan_and_index)
             print(f" [Startup] Project indexing complete. Total files: {stats['total_files']}, chunks: {stats['total_chunks']}")
         except Exception as e:
             print(f" [Startup] Warning: Indexing failed: {e}")
@@ -475,6 +480,283 @@ async def rag_clear_history(session_id: str):
     chat_memory.clear_history(session_id)
     return {"status": "success", "session_id": session_id}
 
+# --- UNIFIED AI CHAT ENDPOINT (General AI + Live Metrics) ---
+class UnifiedChatRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = "default_session"
+    api_key: Optional[str] = None
+    history: Optional[List[Dict[str, str]]] = []
+
+@app.post("/api/chat")
+async def unified_chat(req: UnifiedChatRequest, request: Request):
+    """
+    Unified chat endpoint that bridges general AI knowledge with live platform metrics.
+    The LLM receives the current platform state as context and decides whether to
+    reference live metrics or answer from pre-trained knowledge.
+    """
+    user_key = request.headers.get("x-gemini-key")
+    api_key = req.api_key or user_key or os.environ.get("GEMINI_API_KEY")
+
+    # Collect live metrics snapshot
+    snapshot = get_live_snapshot()
+    metrics_context = format_metrics_for_prompt(snapshot)
+
+    msg_lower = req.message.lower()
+
+    # Detect if the query is about live metrics
+    metrics_keywords = [
+        "temperature", "temp", "gpu", "utilization", "power", "watt",
+        "vram", "memory", "usage", "vgpu", "instance", "running",
+        "job", "scheduler", "queue", "active", "pending", "status",
+        "metrics", "stats", "health", "cluster", "load", "stress",
+        "how much", "how many", "current", "right now", "live"
+    ]
+    is_metrics_query = any(kw in msg_lower for kw in metrics_keywords)
+
+    # Navigation detection (reuse existing logic)
+    navigation_map = {
+        "dashboard": ["dashboard", "home", "main page", "overview", "landing"],
+        "gpu_monitor": ["monitor", "telemetry", "temp", "temperature", "power", "charts", "utilization", "realtime", "real-time", "graphs"],
+        "ai_data_center": ["datacenter", "data center", "fleet", "topology", "cluster", "nodes", "3d view"],
+        "water_resource": ["water", "cooling", "green", "carbon", "efficiency", "environmental", "eco", "planner"],
+        "comparison": ["compare", "comparison", "benchmark", "jupyter", "colab", "speed"],
+        "vgpu": ["provision", "allocate", "vram", "create vgpu", "destroy vgpu", "delete vgpu", "vgpu manager"],
+        "vm_inspector": ["inspector", "vm", "container", "docker", "spec", "cpu-z", "cpu z", "hardware"],
+        "graphics": ["render", "graphics", "surveillance", "viewports", "3d render", "visualize"],
+        "logs": ["logs", "stdout", "stderr", "output", "terminal"]
+    }
+    detected_tab = None
+    for tab_id, keywords in navigation_map.items():
+        if any(kw in msg_lower for kw in keywords):
+            detected_tab = tab_id
+            break
+
+    # If we have an API key, use Gemini with live metrics context
+    if api_key:
+        import urllib.request
+        import json as json_mod
+
+        system_instruction = f"""You are V-GPU Copilot, an advanced AI agent embedded in the V-GPU (Virtual GPU) control plane platform.
+You have two capabilities:
+1. **General AI Knowledge**: You can answer any general question about machine learning, programming, science, math, or any topic using your pre-trained knowledge.
+2. **Live Platform Metrics**: You have access to REAL-TIME live metrics from the V-GPU cluster below. When users ask about GPU temperatures, power draw, running jobs, vGPU instances, or platform health, you MUST reference these live values.
+
+{metrics_context}
+
+### UI Workspace Tabs:
+- 'dashboard': Overall cluster status, scheduling stats, physical GPUs.
+- 'gpu_monitor': Live graphs of compute load, memory, temperature, and power.
+- 'ai_data_center': 3D datacenter node visualization and live job execution.
+- 'water_resource': Environmental cooling impact, carbon intensity, green compute.
+- 'comparison': Side-by-side PyTorch execution benchmarks vs Jupyter and Colab.
+- 'vgpu': Provisioning interface for custom vGPU nodes (setting VRAM/compute).
+- 'vm_inspector': Hypervisor, Docker container limits, CPU-Z hardware specs.
+- 'graphics': Live 3D shape/wireframe render views from vGPU stress testing.
+- 'logs': Live execution stdout/stderr logs.
+
+### Response Rules:
+- If the user asks about current GPU state, temperatures, power, running jobs, VRAM, or any platform metric, provide the ACTUAL values from the LIVE PLATFORM METRICS above.
+- If the user asks a general knowledge question (e.g., "What is gradient descent?", "Explain backpropagation"), answer using your pre-trained knowledge.
+- If the user asks a hybrid question (e.g., "Is GPU 0 running hot? Should I reduce the workload?"), combine live metrics with your expert reasoning.
+- Be warm, conversational, and technically precise.
+- Use markdown formatting with bullet points, code blocks, and bolding.
+
+### Response Output Schema:
+Your response MUST be a JSON object containing exactly these fields:
+{{
+  "text": "Your conversational markdown-formatted answer.",
+  "navigate": "one of the tab IDs listed above if the user wants to navigate, otherwise null",
+  "metrics_used": true or false (whether you referenced live platform metrics in your answer)
+}}
+"""
+
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+
+            # Format chat history
+            contents = []
+            if req.history:
+                for h in req.history[-6:]:
+                    contents.append({
+                        "role": "user" if h.get("role") == "user" else "model",
+                        "parts": [{"text": h.get("content", h.get("text", ""))}]
+                    })
+            contents.append({
+                "role": "user",
+                "parts": [{"text": req.message}]
+            })
+
+            payload = {
+                "contents": contents,
+                "systemInstruction": {
+                    "parts": [{"text": system_instruction}]
+                },
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "temperature": 0.3
+                }
+            }
+
+            def call_api():
+                api_req = urllib.request.Request(
+                    url,
+                    data=json_mod.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST"
+                )
+                with urllib.request.urlopen(api_req, timeout=12) as res:
+                    return res.read().decode("utf-8")
+
+            loop = asyncio.get_event_loop()
+            raw_res = await loop.run_in_executor(None, call_api)
+            res_data = json_mod.loads(raw_res)
+
+            text_out = res_data["candidates"][0]["content"]["parts"][0]["text"]
+            parsed_json = json_mod.loads(text_out)
+
+            nav = parsed_json.get("navigate")
+            if nav not in navigation_map:
+                nav = None
+
+            return {
+                "answer": parsed_json.get("text", ""),
+                "navigate": nav or detected_tab,
+                "metrics_used": parsed_json.get("metrics_used", is_metrics_query),
+                "metrics_snapshot": snapshot if is_metrics_query else None,
+                "session_id": req.session_id
+            }
+        except Exception as e:
+            print(f"Unified chat Gemini API failure, falling back to local engine: {e}")
+
+    # --- Local offline fallback ---
+    response_text = ""
+    metrics_used = False
+
+    # Check conversational intents first
+    greetings = ["hello", "hi", "hey", "good morning", "good afternoon", "good evening", "greetings"]
+    is_greeting = any(msg_lower.startswith(g) or f" {g} " in f" {msg_lower} " for g in greetings)
+    how_are_you = ["how are you", "how are u", "how you doing"]
+    is_how_are_you = any(h in msg_lower for h in how_are_you)
+    appreciation = ["thank you", "thanks", "awesome", "great", "cool", "perfect", "good job"]
+    is_appreciation = any(msg_lower.startswith(a) or f" {a} " in f" {msg_lower} " for a in appreciation)
+
+    if is_greeting:
+        response_text = "Hello! 👋 I am your **V-GPU Copilot** with live metrics access. I can answer general AI questions AND show you real-time platform data. Try asking:\n\n- *\"What's the current GPU temperature?\"*\n- *\"How many vGPU instances are running?\"*\n- *\"What is gradient descent?\"*"
+    elif is_how_are_you:
+        h = snapshot["system_health"]
+        response_text = (f"I'm running great! The cluster is healthy with **{h['total_physical_gpus']} physical GPUs** "
+                        f"and **{h['total_vgpu_instances']} active vGPU instances**. "
+                        f"Average temperature is **{h['cluster_avg_temperature_c']}°C** and utilization is at **{h['cluster_avg_utilization_pct']}%**. "
+                        f"How can I help you today?")
+        metrics_used = True
+    elif is_appreciation:
+        response_text = "You're very welcome! Let me know if you need more GPU metrics, platform insights, or have any other questions!"
+
+    # Metrics-specific offline responses
+    elif any(kw in msg_lower for kw in ["temperature", "temp", "hot", "thermal", "heat"]):
+        metrics_used = True
+        gpu_lines = []
+        for gpu in snapshot["physical_gpus"]:
+            status = "🔴 HOT" if gpu["temperature_c"] > 75 else "🟢 Normal"
+            gpu_lines.append(f"- **GPU {gpu['gpu_id']}**: {gpu['temperature_c']}°C ({status})")
+        response_text = f"## 🌡️ Current GPU Temperatures\n\n" + "\n".join(gpu_lines)
+        h = snapshot["system_health"]
+        response_text += f"\n\n**Cluster Average**: {h['cluster_avg_temperature_c']}°C"
+        if h["any_gpu_hot"]:
+            response_text += "\n\n⚠️ **Warning**: One or more GPUs are running above 75°C. Consider reducing workload or enabling additional cooling."
+
+    elif any(kw in msg_lower for kw in ["power", "watt", "energy", "consumption"]):
+        metrics_used = True
+        gpu_lines = []
+        for gpu in snapshot["physical_gpus"]:
+            gpu_lines.append(f"- **GPU {gpu['gpu_id']}**: {gpu['power_draw_w']}W")
+        h = snapshot["system_health"]
+        response_text = f"## ⚡ Current Power Draw\n\n" + "\n".join(gpu_lines)
+        response_text += f"\n\n**Total Cluster Power**: {h['cluster_total_power_draw_w']}W"
+
+    elif any(kw in msg_lower for kw in ["utilization", "load", "usage", "busy"]):
+        metrics_used = True
+        gpu_lines = []
+        for gpu in snapshot["physical_gpus"]:
+            bar_filled = int(gpu["utilization_pct"] / 10)
+            bar = "█" * bar_filled + "░" * (10 - bar_filled)
+            gpu_lines.append(f"- **GPU {gpu['gpu_id']}**: [{bar}] {gpu['utilization_pct']}%")
+        h = snapshot["system_health"]
+        response_text = f"## 📊 GPU Utilization\n\n" + "\n".join(gpu_lines)
+        response_text += f"\n\n**Cluster Average**: {h['cluster_avg_utilization_pct']}%"
+
+    elif any(kw in msg_lower for kw in ["vram", "memory"]):
+        metrics_used = True
+        gpu_lines = []
+        for gpu in snapshot["physical_gpus"]:
+            gpu_lines.append(f"- **GPU {gpu['gpu_id']}**: {gpu['memory_used_mb']}MB / {gpu['memory_total_mb']}MB ({gpu['memory_used_pct']}%)")
+        h = snapshot["system_health"]
+        response_text = f"## 💾 VRAM Usage\n\n" + "\n".join(gpu_lines)
+        response_text += f"\n\n**Total Cluster VRAM**: {h['cluster_total_vram_used_mb']}MB / {h['cluster_total_vram_capacity_mb']}MB"
+
+    elif any(kw in msg_lower for kw in ["instance", "vgpu", "virtual gpu", "how many"]):
+        metrics_used = True
+        h = snapshot["system_health"]
+        response_text = f"## 🖥️ Active vGPU Instances ({h['total_vgpu_instances']})\n\n"
+        for inst in snapshot["vgpu_instances"]:
+            response_text += (f"- **vGPU {inst['id'][:8]}...** on GPU {inst['physical_gpu_id']}: "
+                             f"VRAM={inst['vram_limit_mb']}MB, Compute={inst['compute_limit_pct']}%, "
+                             f"Container={inst['container_id_short']}\n")
+        if not snapshot["vgpu_instances"]:
+            response_text += "No active vGPU instances. Provision new ones from the vGPU Manager tab."
+
+    elif any(kw in msg_lower for kw in ["job", "scheduler", "queue", "running", "pending", "active"]):
+        metrics_used = True
+        s = snapshot["scheduler"]
+        response_text = (f"## 📋 Scheduler Status\n\n"
+                        f"- **Active Jobs**: {s['active_jobs']}\n"
+                        f"- **Pending Jobs**: {s['pending_jobs']}\n"
+                        f"- **Completed Jobs**: {s['completed_jobs']}\n"
+                        f"- **Total Processed**: {s['total_jobs_processed']}\n"
+                        f"- **Avg Wait Time**: {s['avg_wait_time_s']}s\n")
+        if snapshot["recent_jobs"]:
+            response_text += f"\n**Recent Jobs:**\n"
+            for job in snapshot["recent_jobs"]:
+                response_text += f"- [{job['status']}] {job['script']} on {job['vgpu_id'][:8]}...\n"
+
+    elif any(kw in msg_lower for kw in ["status", "health", "overview", "cluster", "stats", "metrics"]):
+        metrics_used = True
+        h = snapshot["system_health"]
+        s = snapshot["scheduler"]
+        response_text = (f"## 🏥 Cluster Health Overview\n\n"
+                        f"| Metric | Value |\n|---|---|\n"
+                        f"| Physical GPUs | {h['total_physical_gpus']} |\n"
+                        f"| Active vGPU Instances | {h['total_vgpu_instances']} |\n"
+                        f"| Avg GPU Utilization | {h['cluster_avg_utilization_pct']}% |\n"
+                        f"| Avg GPU Temperature | {h['cluster_avg_temperature_c']}°C |\n"
+                        f"| Total Power Draw | {h['cluster_total_power_draw_w']}W |\n"
+                        f"| VRAM Used/Total | {h['cluster_total_vram_used_mb']}MB / {h['cluster_total_vram_capacity_mb']}MB |\n"
+                        f"| Active Jobs | {s['active_jobs']} |\n"
+                        f"| Pending Jobs | {s['pending_jobs']} |\n")
+
+    # General fallback
+    elif not response_text:
+        response_text = ("I can help you with **live platform metrics** and **general AI questions**! Try asking:\n\n"
+                        "📊 **Metrics**: *\"What's the GPU temperature?\"*, *\"Show me VRAM usage\"*, *\"How many jobs are running?\"*\n\n"
+                        "🧠 **General AI**: *\"What is gradient descent?\"*, *\"Explain backpropagation\"*\n\n"
+                        "🔀 **Navigation**: *\"Take me to the GPU Monitor\"*, *\"Open the scheduler\"*\n\n"
+                        "*Tip: Connect your Gemini API Key to enable full conversational AI with live metrics awareness!*")
+
+    return {
+        "answer": response_text,
+        "navigate": detected_tab,
+        "metrics_used": metrics_used,
+        "metrics_snapshot": snapshot if metrics_used else None,
+        "session_id": req.session_id
+    }
+
+
+@app.get("/api/metrics/snapshot")
+async def get_metrics_snapshot():
+    """Returns the current live metrics snapshot for the entire V-GPU platform."""
+    return get_live_snapshot()
+
+
 class JobRequest(BaseModel):
     vgpu_id: str
     script_name: str
@@ -758,6 +1040,7 @@ async def get_scheduler_stats():
 @app.websocket("/ws/metrics")
 async def websocket_metrics(websocket: WebSocket):
     await websocket.accept()
+    last_jobs_len = -1  # Track recent_jobs changes to avoid sending unchanged data
     try:
         while True:
             metrics = []
@@ -767,18 +1050,31 @@ async def websocket_metrics(websocket: WebSocket):
                 instances.extend(gpu.list_instances())
             
             queue_status = scheduler.get_queue_status()
-            await websocket.send_json({
+            
+            payload = {
                 "physical_gpus": metrics,
                 "vgpu_instances": instances,
                 "timestamp": time.time(),
-                "recent_jobs": recent_jobs,
                 "scheduler": {
                     "active_jobs": queue_status.get("running_jobs", 0),
                     "pending_jobs": queue_status.get("queued_jobs", 0),
                     "queue_length": queue_status.get("queued_jobs", 0) + queue_status.get("running_jobs", 0),
                     "running_jobs": list(scheduler.running_jobs.values())
                 }
-            })
+            }
+            
+            # Only include recent_jobs when the list has changed — avoids sending
+            # multi-KB raw_output strings every second when jobs haven't changed.
+            current_jobs_len = len(recent_jobs)
+            if current_jobs_len != last_jobs_len:
+                # Strip raw_output from WS payload to reduce size from ~5KB to ~1KB
+                payload["recent_jobs"] = [
+                    {k: v for k, v in job.items() if k != "raw_output"}
+                    for job in recent_jobs
+                ]
+                last_jobs_len = current_jobs_len
+            
+            await websocket.send_json(payload)
             await asyncio.sleep(1.0)
     except WebSocketDisconnect:
         pass

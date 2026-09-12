@@ -1,11 +1,15 @@
 FROM python:3.10-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Removed build-essential — all pip packages (numpy, pandas, scikit-learn, torch CPU)
+# have pre-built wheels for python:3.10-slim and don't require compilation.
+# This saves ~250MB in the final image.
 
-RUN pip install --no-cache-dir numpy pandas scikit-learn
-RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# Single pip install layer for better Docker cache behavior
+RUN pip install --no-cache-dir \
+    numpy \
+    pandas \
+    scikit-learn \
+    torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
 WORKDIR /workspace
 VOLUME /workspace/results

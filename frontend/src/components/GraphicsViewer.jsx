@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Monitor, Video, Cpu, Activity, AlertTriangle } from 'lucide-react'
 
-function GraphicsViewer({ theme = 'light' }) {
+function GraphicsViewer({ theme = 'light', isActive = true }) {
   const canvasRef = useRef(null)
   const [selectedVGPU, setSelectedVGPU] = useState(null)
   const [stressMode, setStressMode] = useState(false)
@@ -15,13 +15,21 @@ function GraphicsViewer({ theme = 'light' }) {
   const { data: vGPUs } = useQuery({
     queryKey: ['vgpus'],
     queryFn: () => fetch('http://localhost:8000/api/vgpu/list').then(res => res.json()),
-    refetchInterval: 2000
+    refetchInterval: isActive ? 4000 : false
   })
 
   const selectedVgpuInfo = vGPUs?.find(v => v.id === selectedVGPU)
   const computePct = selectedVgpuInfo?.compute_limit || 50
 
   useEffect(() => {
+    if (!isActive) {
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
+      return
+    }
+
     let frameCount = 0
     let lastTime = performance.now()
     let bytesReceived = 0
@@ -123,7 +131,7 @@ function GraphicsViewer({ theme = 'light' }) {
     } else {
       clearInterval(statsInterval)
     }
-  }, [selectedVGPU, stressMode, computePct, theme])
+  }, [selectedVGPU, stressMode, computePct, theme, isActive])
 
   return (
     <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem', background: 'var(--black)', minHeight: '100%' }}>

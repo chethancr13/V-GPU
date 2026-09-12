@@ -64,35 +64,18 @@ export function useJobs(pollingInterval = 3000) {
     return { jobs, loading, refreshJobs };
 }
 
+/**
+ * useMetrics — now delegates to the shared MetricsContext instead of
+ * opening its own WebSocket connection. This is a backwards-compatible
+ * wrapper for any existing consumers.
+ */
 export function useMetrics() {
-    const [metrics, setMetrics] = useState(null);
-    const socketRef = useRef(null);
-
-    useEffect(() => {
-        // Connect to FastAPI WebSockets
-        const wsUrl = `ws://localhost:8000/ws/metrics`;
-        socketRef.current = new WebSocket(wsUrl);
-
-        socketRef.current.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                setMetrics(data);
-            } catch (e) {
-                console.error("Failed to parse WS payload", e);
-            }
-        };
-
-        socketRef.current.onerror = (error) => {
-            console.error("WebSocket Error:", error);
-        };
-
-        return () => {
-             if (socketRef.current) socketRef.current.close();
-        };
-    }, []);
-
+    // Re-export from shared context for backward compatibility
+    const { useSharedMetrics } = require('../contexts/MetricsContext');
+    const { metrics } = useSharedMetrics();
     return { metrics };
 }
+
 
 export function useAllocation() {
     const [isAllocating, setIsAllocating] = useState(false);

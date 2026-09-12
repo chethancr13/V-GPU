@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback, Suspense } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Text, Html, Environment, Float, RoundedBox } from '@react-three/drei'
+import { useSharedMetrics } from '../contexts/MetricsContext'
+import { getCachedDatasets, getCachedScripts } from '../api/cache'
 import * as THREE from 'three'
 import {
   Server, Activity, Cpu, Database, Zap, Thermometer,
@@ -2322,9 +2324,8 @@ function CoolantFlowDiagram({ powerTelemetry, visible }) {
 /* ═══════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════ */
-function ControlCenter({ theme = 'light' }) {
+function ControlCenter({ theme = 'light', isActive = true }) {
   const [data, setData] = useState(null)
-  const [isConnected, setIsConnected] = useState(false)
   const [datasets, setDatasets] = useState([])
   const [scripts, setScripts] = useState([])
   const [selectedRack, setSelectedRack] = useState(null)
@@ -2358,6 +2359,7 @@ function ControlCenter({ theme = 'light' }) {
   })
 
   useEffect(() => {
+    if (!isActive) return
     const interval = setInterval(() => {
       setPowerTelemetry(prev => ({
         ...prev,
@@ -2375,9 +2377,9 @@ function ControlCenter({ theme = 'light' }) {
         chillerTempReturn: 28 + (Math.random() - 0.5) * 0.5,
         waterConsumption: Math.max(150, Math.min(250, prev.waterConsumption + (Math.random() - 0.5) * 3)),
       }))
-    }, 1500)
+    }, 3000)  // Slowed from 1.5s to 3s to reduce re-renders
     return () => clearInterval(interval)
-  }, [genActive, batteryCharging])
+  }, [genActive, batteryCharging, isActive])
 
   const serversList = useMemo(() => [
     { id: 'rack-gpu-0', name: 'GPU-HOST-01', type: 'gpu', gpuId: 0, label: 'ALPHA HOST', model: 'NVIDIA H100 v3 (32GB)', powerLimit: 350 },
@@ -2427,22 +2429,28 @@ function ControlCenter({ theme = 'light' }) {
     pos: rackPositions[s.id]
   })), [serversList, rackPositions])
 
+  // Shared WebSocket connection (replaces per-component WS)
+  const { metrics: wsData, isConnected } = useSharedMetrics()
+
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8000/ws/metrics')
-    ws.onopen = () => { setIsConnected(true); addLog('Telemetry stream connected.', 'success') }
-    ws.onclose = () => { setIsConnected(false); addLog('Telemetry connection lost.', 'error') }
-    ws.onmessage = (event) => {
-      try { setData(JSON.parse(event.data)) } catch (e) {}
+    if (wsData) {
+      setData(wsData)
     }
-    fetch('http://localhost:8000/api/datasets').then(r => r.json()).then(res => {
+  }, [wsData])
+
+  useEffect(() => {
+    if (isConnected) addLog('Telemetry stream connected.', 'success')
+  }, [isConnected])
+
+  useEffect(() => {
+    getCachedDatasets().then(res => {
       setDatasets(res.datasets || [])
       if (res.datasets?.length > 0) setSelectedDataset(res.datasets[0])
     }).catch(() => {})
-    fetch('http://localhost:8000/api/scripts').then(r => r.json()).then(res => {
+    getCachedScripts().then(res => {
       setScripts(res.scripts || [])
       if (res.scripts?.length > 0) setSelectedScript(res.scripts[0])
     }).catch(() => {})
-    return () => ws.close()
   }, [])
 
   const addLog = useCallback((msg, level = 'info') => {
@@ -2568,6 +2576,7 @@ function ControlCenter({ theme = 'light' }) {
       `}</style>
 
       <Canvas
+        frameloop={isActive ? 'always' : 'never'}
         shadows dpr={[1, 2]}
         gl={{ antialias: true, powerPreference: 'high-performance', toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: isDarkMode ? 1.35 : 1.1 }}
         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}

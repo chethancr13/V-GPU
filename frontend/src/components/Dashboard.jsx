@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useSharedMetrics } from '../contexts/MetricsContext'
+import { getCachedVgpuList, getCachedScripts, getCachedDatasets, invalidateDatasetsCache } from '../api/cache'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { 
   Activity, Cpu, Database, Zap, Target, 
@@ -9,7 +11,6 @@ import {
 function Dashboard() {
   const [data, setData] = useState(null)
   const [history, setHistory] = useState([])
-  const [isConnected, setIsConnected] = useState(false)
 
   // ML Job Submission state
   const [vgpuList, setVgpuList] = useState([])
@@ -27,49 +28,42 @@ function Dashboard() {
   ])
   const [activeLeaderboard, setActiveLeaderboard] = useState([])
 
-  // Fetch lists on mount & websocket sync
+  // Shared WebSocket connection (replaces per-component WS)
+  const { metrics: wsMetrics, isConnected } = useSharedMetrics()
+
+  // Fetch lists on mount
   useEffect(() => {
     fetchHardwareAndFiles()
+  }, [])
 
-    const wsUrl = 'ws://localhost:8000/ws/metrics'
-    const ws = new WebSocket(wsUrl)
-    
-    ws.onopen = () => setIsConnected(true)
-    ws.onclose = () => setIsConnected(false)
-    ws.onmessage = (event) => {
-      try {
-        const metrics = JSON.parse(event.data)
-        setData(metrics)
-        
-        if (metrics.recent_jobs?.[0]?.leaderboard) {
-          setActiveLeaderboard(metrics.recent_jobs[0].leaderboard)
-        }
-        
-        if (metrics.physical_gpus?.[0]) {
-          setHistory(prev => {
-            const newEntry = {
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-              utilization: metrics.physical_gpus[0].gpu_utilization,
-              memory: metrics.physical_gpus[0].memory_used,
-              temp: metrics.physical_gpus[0].temperature
-            }
-            return [...prev.slice(-29), newEntry]
-          })
-        }
-      } catch (e) {
-        console.error("Failed to parse WS metrics:", e)
-      }
+  // Process incoming shared metrics
+  useEffect(() => {
+    if (!wsMetrics) return
+    setData(wsMetrics)
+
+    if (wsMetrics.recent_jobs?.[0]?.leaderboard) {
+      setActiveLeaderboard(wsMetrics.recent_jobs[0].leaderboard)
     }
 
-    return () => ws.close()
-  }, [])
+    if (wsMetrics.physical_gpus?.[0]) {
+      setHistory(prev => {
+        const newEntry = {
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          utilization: wsMetrics.physical_gpus[0].gpu_utilization,
+          memory: wsMetrics.physical_gpus[0].memory_used,
+          temp: wsMetrics.physical_gpus[0].temperature
+        }
+        return [...prev.slice(-29), newEntry]
+      })
+    }
+  }, [wsMetrics])
 
   const fetchHardwareAndFiles = async () => {
     try {
       const [vRes, sRes, dRes] = await Promise.all([
-        fetch('http://localhost:8000/api/vgpu/list').then(r => r.json()),
-        fetch('http://localhost:8000/api/scripts').then(r => r.json()),
-        fetch('http://localhost:8000/api/datasets').then(r => r.json())
+        getCachedVgpuList(),
+        getCachedScripts(),
+        getCachedDatasets()
       ])
       
       setVgpuList(vRes || [])
@@ -105,7 +99,8 @@ function Dashboard() {
       if (result.status === 'success') {
         setTerminalLogs(prev => [...prev, ` System: Ingestion successful! Dataset [${file.name}] registered.`])
         // Refresh dataset lists
-        const dRes = await fetch('http://localhost:8000/api/datasets').then(r => r.json())
+        invalidateDatasetsCache()
+        const dRes = await getCachedDatasets(true)
         setDatasetList(dRes?.datasets || [])
         setSelectedDataset(file.name)
       } else {

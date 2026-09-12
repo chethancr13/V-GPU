@@ -1,60 +1,44 @@
 import { useEffect, useState } from 'react'
+import { useSharedMetrics } from '../contexts/MetricsContext'
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Activity, Cpu, Database, Zap, Thermometer, Play, Square } from 'lucide-react'
 
 function GPUMonitor() {
   const [data, setData] = useState(null)
   const [history, setHistory] = useState([])
-  const [isConnected, setIsConnected] = useState(false)
   const [gpuStressStates, setGpuStressStates] = useState({ 0: false, 1: false })
   const [isLoading, setIsLoading] = useState(true)
 
+  // Shared WebSocket connection (replaces per-component WS)
+  const { metrics: wsData, isConnected } = useSharedMetrics()
+
+  // Process incoming shared metrics into local state
   useEffect(() => {
-    const wsUrl = 'ws://localhost:8000/ws/metrics'
-    const ws = new WebSocket(wsUrl)
+    if (!wsData) return
+    setData(wsData)
+    setIsLoading(false)
 
-    ws.onopen = () => {
-      setIsConnected(true)
-      setIsLoading(false)
-    }
-
-    ws.onclose = () => {
-      setIsConnected(false)
-    }
-
-    ws.onmessage = (event) => {
-      try {
-        const metrics = JSON.parse(event.data)
-        setData(metrics)
-        setIsLoading(false)
-
-        if (metrics.physical_gpus) {
-          setHistory(prev => {
-            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-            const gpu0 = metrics.physical_gpus[0] || { gpu_utilization: 0, memory_used: 0, temperature: 40, power_draw: 50 }
-            const gpu1 = metrics.physical_gpus[1] || { gpu_utilization: 0, memory_used: 0, temperature: 40, power_draw: 50 }
-            
-            const newEntry = {
-              time: timeStr,
-              gpu0_util: gpu0.gpu_utilization,
-              gpu0_mem: gpu0.memory_used,
-              gpu0_temp: gpu0.temperature,
-              gpu0_power: gpu0.power_draw,
-              gpu1_util: gpu1.gpu_utilization,
-              gpu1_mem: gpu1.memory_used,
-              gpu1_temp: gpu1.temperature,
-              gpu1_power: gpu1.power_draw,
-            }
-            return [...prev.slice(-29), newEntry]
-          })
+    if (wsData.physical_gpus) {
+      setHistory(prev => {
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        const gpu0 = wsData.physical_gpus[0] || { gpu_utilization: 0, memory_used: 0, temperature: 40, power_draw: 50 }
+        const gpu1 = wsData.physical_gpus[1] || { gpu_utilization: 0, memory_used: 0, temperature: 40, power_draw: 50 }
+        
+        const newEntry = {
+          time: timeStr,
+          gpu0_util: gpu0.gpu_utilization,
+          gpu0_mem: gpu0.memory_used,
+          gpu0_temp: gpu0.temperature,
+          gpu0_power: gpu0.power_draw,
+          gpu1_util: gpu1.gpu_utilization,
+          gpu1_mem: gpu1.memory_used,
+          gpu1_temp: gpu1.temperature,
+          gpu1_power: gpu1.power_draw,
         }
-      } catch (e) {
-        console.error("Failed to parse WS metrics in GPU Monitor:", e)
-      }
+        return [...prev.slice(-29), newEntry]
+      })
     }
-
-    return () => ws.close()
-  }, [])
+  }, [wsData])
 
   const handleToggleStress = async (gpuId) => {
     const nextStressState = !gpuStressStates[gpuId]

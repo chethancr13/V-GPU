@@ -81,39 +81,7 @@ function VGPUManager() {
   const [hoveredChip, setHoveredChip] = useState(null)
   const [animatingIn, setAnimatingIn] = useState(new Set())
   const [animatingOut, setAnimatingOut] = useState(new Set())
-  const [trayRotation, setTrayRotation] = useState({ x: 28, y: 8, z: -8 })
-  const [isTrayDragging, setIsTrayDragging] = useState(false)
-  const trayRef = useRef(null)
-  const trayDragStart = useRef({ x: 0, y: 0 })
-  const trayRotStart = useRef({ x: 28, z: -8 })
 
-  const handleTrayMouseDown = (e) => {
-    setIsTrayDragging(true)
-    trayDragStart.current = { x: e.clientX, y: e.clientY }
-    trayRotStart.current = { x: trayRotation.x, z: trayRotation.z }
-    e.preventDefault()
-  }
-
-  const handleTrayMouseMove = (e) => {
-    if (!isTrayDragging) return
-    const deltaX = e.clientX - trayDragStart.current.x
-    const deltaY = e.clientY - trayDragStart.current.y
-    const sensitivity = 0.35
-    let newX = trayRotStart.current.x - (deltaY * sensitivity)
-    let newZ = trayRotStart.current.z + (deltaX * sensitivity)
-    newX = Math.max(5, Math.min(65, newX))
-    newZ = Math.max(-50, Math.min(30, newZ))
-    setTrayRotation({
-      x: newX,
-      y: 8 + (newZ + 8) * 0.15,
-      z: newZ
-    })
-  }
-
-  const handleTrayMouseUp = () => {
-    setIsTrayDragging(false)
-    setTrayRotation({ x: 28, y: 8, z: -8 })
-  }
 
   const prevIdsRef = useRef(new Set())
   const styleRef = useRef(null)
@@ -736,23 +704,17 @@ function VGPUManager() {
 
         {/* 3D perspective scene */}
         <div 
-          ref={trayRef}
-          onMouseDown={handleTrayMouseDown}
-          onMouseMove={handleTrayMouseMove}
-          onMouseUp={handleTrayMouseUp}
-          onMouseLeave={handleTrayMouseUp}
           style={{
             perspective: '1200px',
             display: 'flex', justifyContent: 'center', alignItems: 'center',
             padding: '1.5rem 0 2rem',
-            cursor: isTrayDragging ? 'grabbing' : 'grab',
           }}
         >
           <div style={{
-            transform: `rotateX(${trayRotation.x}deg) rotateZ(${trayRotation.z}deg) rotateY(${trayRotation.y}deg)`,
+            transform: 'rotateX(28deg) rotateZ(-8deg) rotateY(8deg)',
             transformStyle: 'preserve-3d',
             display: 'flex', alignItems: 'stretch', gap: '0px',
-            transition: isTrayDragging ? 'none' : 'transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)',
+            transition: 'transform 0.6s ease',
             position: 'relative',
           }}>
             {/* Tray body */}

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useSharedMetrics } from '../contexts/MetricsContext'
+import { getCachedDatasets, getCachedScripts } from '../api/cache'
 import { Server, Database, Activity, Play, Terminal, Cpu, Network, Layers, RefreshCw, Send, Square, Check, AlertTriangle, Shield, CheckCircle, Battery, Droplet, Zap, Fuel, Power, Cable, Thermometer, Gauge } from 'lucide-react'
 
-function AIDataCenter() {
+function AIDataCenter({ isActive = true }) {
   const [data, setData] = useState(null)
   const [datasets, setDatasets] = useState([])
   const [scripts, setScripts] = useState([])
@@ -39,7 +41,7 @@ function AIDataCenter() {
   const [provPower, setProvPower] = useState(300)
   const [provError, setProvError] = useState('')
   const [gpuStressStates, setGpuStressStates] = useState({ 0: false, 1: false })
-  const [isConnected, setIsConnected] = useState(false)
+
   const [isDispatching, setIsDispatching] = useState(false)
   const [customTelemetry, setCustomTelemetry] = useState({})
   const [selectedScript, setSelectedScript] = useState('')
@@ -62,7 +64,9 @@ function AIDataCenter() {
     waterConsumption: 180, wue: 0.31,
   })
 
+  // Simulated power/UPS telemetry — slowed from 1.5s to 3s to reduce re-renders
   useEffect(() => {
+    if (!isActive) return
     const interval = setInterval(() => {
       setPowerTel(prev => ({
         ...prev,
@@ -78,30 +82,31 @@ function AIDataCenter() {
         chillerFlow: Math.max(180, Math.min(350, prev.chillerFlow + (Math.random() - 0.5) * 5)),
         waterConsumption: Math.max(150, Math.min(250, prev.waterConsumption + (Math.random() - 0.5) * 3)),
       }))
-    }, 1500)
+    }, 3000)
     return () => clearInterval(interval)
-  }, [genActive, batteryCharging])
+  }, [genActive, batteryCharging, isActive])
+
+  // Shared WebSocket connection (replaces per-component WS)
+  const { metrics: wsMetrics, isConnected } = useSharedMetrics()
 
   useEffect(() => {
-    const wsUrl = 'ws://localhost:8000/ws/metrics'
-    const ws = new WebSocket(wsUrl)
-    ws.onopen = () => setIsConnected(true)
-    ws.onclose = () => setIsConnected(false)
-    ws.onmessage = (event) => {
-      try { const metrics = JSON.parse(event.data); setData(metrics) } catch (e) { console.error("WS error:", e) }
-    }
-    fetch('http://localhost:8000/api/datasets').then(r => r.json()).then(res => {
+    if (wsMetrics) setData(wsMetrics)
+  }, [wsMetrics])
+
+  useEffect(() => {
+    getCachedDatasets().then(res => {
       setDatasets(res.datasets || [])
       if (res.datasets?.length > 0) setSelectedDataset(res.datasets[0])
     }).catch(e => console.error(e))
-    fetch('http://localhost:8000/api/scripts').then(r => r.json()).then(res => {
+    getCachedScripts().then(res => {
       setScripts(res.scripts || [])
       if (res.scripts?.length > 0) setSelectedScript(res.scripts[0])
     }).catch(e => console.error(e))
-    return () => ws.close()
   }, [])
 
+  // Custom server telemetry simulation — slowed from 1s to 3s to reduce re-renders
   useEffect(() => {
+    if (!isActive) return
     const interval = setInterval(() => {
       setCustomTelemetry(prev => {
         const next = { ...prev }
@@ -119,9 +124,9 @@ function AIDataCenter() {
         })
         return next
       })
-    }, 1000)
+    }, 3000)
     return () => clearInterval(interval)
-  }, [serversList, gpuStressStates])
+  }, [serversList, gpuStressStates, isActive])
 
   const handleMouseDown = (e) => { setDragStart({ x: e.clientX, angle: rotationAngle }) }
   const handleMouseMove = (e) => {

@@ -3,7 +3,21 @@ import random
 import time
 from typing import Dict, List, Optional
 from dataclasses import dataclass
-import docker
+
+# Lazy Docker import — avoid importing docker at module level to prevent
+# 200-800ms startup delay when Docker daemon is slow to respond
+_docker_module = None
+
+def _get_docker_module():
+    """Lazy-import docker module on first use."""
+    global _docker_module
+    if _docker_module is None:
+        try:
+            import docker
+            _docker_module = docker
+        except ImportError:
+            _docker_module = False  # Sentinel: module not available
+    return _docker_module if _docker_module is not False else None
 
 @dataclass
 class VGPUInstance:
@@ -27,23 +41,73 @@ class VGPUDevice:
         self._simulated_temperature = 40.0
         self._simulated_power_draw = 50.0
         self._last_update = time.time()
-        try:
-            self.docker_client = docker.from_env()
-            self.docker_available = True
-        except:
-            self.docker_client = None
-            self.docker_available = False
-            
+
+        # Lazy Docker client — initialized on first actual Docker operation
+        self._docker_client = None
+        self._docker_available = None  # None = not yet checked
+
+        # Cache scheduler reference to avoid repeated import overhead
+        self._scheduler_ref = None
+
         # Background monitor thread
         import threading
         self._monitor_running = True
         self._monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self._monitor_thread.start()
 
+    @property
+    def docker_client(self):
+        """Lazy-initialize Docker client on first access.
+        Avoids 200-800ms startup delay per GPU when Docker daemon is slow."""
+        if self._docker_available is None:
+            self._init_docker()
+        return self._docker_client
+
+    @docker_client.setter
+    def docker_client(self, value):
+        self._docker_client = value
+
+    @property
+    def docker_available(self):
+        """Check if Docker is available, initializing client if not yet checked."""
+        if self._docker_available is None:
+            self._init_docker()
+        return self._docker_available
+
+    @docker_available.setter
+    def docker_available(self, value):
+        self._docker_available = value
+
+    def _init_docker(self):
+        """Initialize Docker client lazily. Called on first actual use."""
+        docker_mod = _get_docker_module()
+        if docker_mod is None:
+            self._docker_client = None
+            self._docker_available = False
+            return
+        try:
+            self._docker_client = docker_mod.from_env()
+            self._docker_available = True
+        except Exception:
+            self._docker_client = None
+            self._docker_available = False
+
+    def _get_scheduler(self):
+        """Cache scheduler reference to avoid import overhead every monitor tick."""
+        if self._scheduler_ref is None:
+            try:
+                from core.scheduler import scheduler
+                self._scheduler_ref = scheduler
+            except Exception:
+                pass
+        return self._scheduler_ref
+
     def _monitor_loop(self):
+        # Increased interval from 1s to 3s — container.stats() is expensive (1-3s per call)
+        # and 1Hz resolution isn't needed for simulated telemetry display
         while self._monitor_running:
             self._update_real_metrics()
-            time.sleep(1)
+            time.sleep(3)
 
     def _update_real_metrics(self):
         # Poll actual Docker container stats
@@ -55,7 +119,7 @@ class VGPUDevice:
             for inst in list(self.instances.values()):
                 if inst.container_id:
                     try:
-                        container = self.docker_client.containers.get(inst.container_id)
+                        container = self._docker_client.containers.get(inst.container_id)
                         # Use a small timeout for stats to avoid hanging
                         stats = container.stats(stream=False)
                         
@@ -70,35 +134,36 @@ class VGPUDevice:
                         
                         mem_used = stats['memory_stats']['usage'] / (1024 * 1024) # MB
                         total_mem_used += mem_used
-                    except:
+                    except Exception:
                         pass
         
         # Add simulated load based on running scheduler tasks and manual stress
         scheduler_load = 0.0
         scheduler_mem = 0.0
-        try:
-            from core.scheduler import scheduler
-            active_instances_with_jobs = 0
-            for inst_id in list(self.instances.keys()):
-                assigned_jobs = scheduler.vgpu_assignments.get(inst_id, [])
-                if assigned_jobs:
-                    active_instances_with_jobs += 1
-            
-            for inst_id in list(self.instances.keys()):
-                assigned_jobs = scheduler.vgpu_assignments.get(inst_id, [])
-                if assigned_jobs:
-                    # Each running job consumes compute and VRAM based on the vGPU configuration
-                    inst = self.instances[inst_id]
-                    if active_instances_with_jobs > 1:
-                        # Distributed workload: workload stress per VM is reduced
-                        scheduler_load += (inst.compute_limit / active_instances_with_jobs)
-                        scheduler_mem += (inst.vram_limit * 0.85 / active_instances_with_jobs)
-                    else:
-                        # Single VM workload: full stress load
-                        scheduler_load += inst.compute_limit
-                        scheduler_mem += inst.vram_limit * 0.85
-        except Exception:
-            pass
+        sched = self._get_scheduler()
+        if sched is not None:
+            try:
+                active_instances_with_jobs = 0
+                for inst_id in list(self.instances.keys()):
+                    assigned_jobs = sched.vgpu_assignments.get(inst_id, [])
+                    if assigned_jobs:
+                        active_instances_with_jobs += 1
+                
+                for inst_id in list(self.instances.keys()):
+                    assigned_jobs = sched.vgpu_assignments.get(inst_id, [])
+                    if assigned_jobs:
+                        # Each running job consumes compute and VRAM based on the vGPU configuration
+                        inst = self.instances[inst_id]
+                        if active_instances_with_jobs > 1:
+                            # Distributed workload: workload stress per VM is reduced
+                            scheduler_load += (inst.compute_limit / active_instances_with_jobs)
+                            scheduler_mem += (inst.vram_limit * 0.85 / active_instances_with_jobs)
+                        else:
+                            # Single VM workload: full stress load
+                            scheduler_load += inst.compute_limit
+                            scheduler_mem += inst.vram_limit * 0.85
+            except Exception:
+                pass
 
         # Apply manual stress if toggled
         if getattr(self, 'simulated_stress', False):
@@ -154,7 +219,13 @@ class VGPUDevice:
                 # Pre-create directories locally to prevent Docker from creating them as root-owned
                 os.makedirs(f"{cwd}/data/results/{instance_id}", exist_ok=True)
                 os.makedirs(f"{cwd}/data/datasets", exist_ok=True)
-                container = self.docker_client.containers.run(
+
+                # Map compute_limit (0-100%) to CPU shares and memory limit
+                # Default Docker CPU shares = 1024. Scale proportionally.
+                cpu_quota = max(0.25, compute_limit / 100.0 * 2.0)  # Allow up to 2 CPUs at 100%
+                mem_limit_mb = max(256, vram_limit)  # At least 256MB, otherwise match vram_limit
+
+                container = self._docker_client.containers.run(
                     "vgpu-worker",
                     command=["sleep", "infinity"],
                     detach=True,
@@ -169,6 +240,11 @@ class VGPUDevice:
                         f"{cwd}/data/datasets": {"bind": "/workspace/dataset", "mode": "ro"},
                         f"{cwd}": {"bind": "/workspace/scripts", "mode": "ro"}
                     },
+                    # Resource limits to prevent scheduling contention across parallel jobs
+                    mem_limit=f"{mem_limit_mb}m",
+                    cpus=cpu_quota,
+                    # Containers only need exec access, no networking needed
+                    network_mode="none",
                     tty=True,
                     stdin_open=True
                 )
@@ -195,7 +271,7 @@ class VGPUDevice:
             instance = self.instances[instance_id]
             if instance.container_id:
                 try:
-                    container = self.docker_client.containers.get(instance.container_id)
+                    container = self._docker_client.containers.get(instance.container_id)
                     container.stop()
                     container.remove()
                 except:
@@ -225,7 +301,7 @@ class VGPUDevice:
         # Optimization: Ensure it's running before returning it
         if self.docker_available:
             try:
-                container = self.docker_client.containers.get(inst.container_id)
+                container = self._docker_client.containers.get(inst.container_id)
                 if container.status != 'running':
                     print(f" [vGPU Driver] Container {inst.container_id[:12]} is {container.status}. Restarting...")
                     container.start()
@@ -236,7 +312,11 @@ class VGPUDevice:
                     cwd = os.getcwd()
                     os.makedirs(f"{cwd}/data/results/{vgpu_id}", exist_ok=True)
                     os.makedirs(f"{cwd}/data/datasets", exist_ok=True)
-                    container = self.docker_client.containers.run(
+
+                    cpu_quota = max(0.25, inst.compute_limit / 100.0 * 2.0)
+                    mem_limit_mb = max(256, inst.vram_limit)
+
+                    container = self._docker_client.containers.run(
                         "vgpu-worker",
                         command=["sleep", "infinity"],
                         detach=True,
@@ -251,6 +331,9 @@ class VGPUDevice:
                             f"{cwd}/data/datasets": {"bind": "/workspace/dataset", "mode": "ro"},
                             f"{cwd}": {"bind": "/workspace/scripts", "mode": "ro"}
                         },
+                        mem_limit=f"{mem_limit_mb}m",
+                        cpus=cpu_quota,
+                        network_mode="none",
                         tty=True,
                         stdin_open=True
                     )
