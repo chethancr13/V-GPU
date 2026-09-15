@@ -1324,6 +1324,403 @@ function QuantumInterconnect() {
   )
 }
 
+// Top-level helpers for BIM model to avoid component redefinition during render
+function BIMPipe({ from, to, radius = 0.06, material }) {
+  const start = useMemo(() => new THREE.Vector3(...from), [from[0], from[1], from[2]])
+  const end = useMemo(() => new THREE.Vector3(...to), [to[0], to[1], to[2]])
+  const { mid, quat, len } = useMemo(() => {
+    const m = start.clone().add(end).multiplyScalar(0.5)
+    const dir = end.clone().sub(start)
+    const l = dir.length()
+    const q = new THREE.Quaternion()
+    if (l > 0.0001) {
+      q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize())
+    }
+    return { mid: m, quat: q, len: l }
+  }, [start, end])
+  return (
+    <mesh position={[mid.x, mid.y, mid.z]} quaternion={quat} material={material}>
+      <cylinderGeometry args={[radius, radius, len, 12]} />
+    </mesh>
+  )
+}
+
+function BIMElbow({ pos, radius = 0.08, material }) {
+  return (
+    <mesh position={pos} material={material}>
+      <sphereGeometry args={[radius, 10, 10]} />
+    </mesh>
+  )
+}
+
+function BIMDuct({ position, size, material }) {
+  return (
+    <mesh position={position} material={material} castShadow>
+      <boxGeometry args={size} />
+    </mesh>
+  )
+}
+
+/* ─────────────────── BIM PIPELINE 3D MODEL (DENSE MEP INFRASTRUCTURE) ─────────────────── */
+function BIMPipelineModel({ visible }) {
+  // Dense colored piping materials matching BIM/MEP reference image
+  const redPipeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#dc2626', metalness: 0.85, roughness: 0.15 }), [])
+  const bluePipeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#2563eb', metalness: 0.85, roughness: 0.15 }), [])
+  const orangePipeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ea580c', metalness: 0.8, roughness: 0.2 }), [])
+  const cyanPipeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#06b6d4', metalness: 0.85, roughness: 0.15 }), [])
+  const greenPipeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#16a34a', metalness: 0.8, roughness: 0.2 }), [])
+  const magentaPipeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#d946ef', metalness: 0.8, roughness: 0.2 }), [])
+  const whiteDuctMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#e2e8f0', metalness: 0.3, roughness: 0.4 }), [])
+  const darkSteelMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#1e293b', metalness: 0.9, roughness: 0.15 }), [])
+  const yellowTrayMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#f59e0b', metalness: 0.3, roughness: 0.3 }), [])
+  const brownPipeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#92400e', metalness: 0.7, roughness: 0.3 }), [])
+
+  if (!visible) return null
+
+  const Pipe = BIMPipe
+  const Elbow = BIMElbow
+  const Duct = BIMDuct
+
+  return (
+    <group>
+      {/* ═══════════════ RED PIPES — HOT WATER / FIRE SUPPRESSION ═══════════════ */}
+      {/* Main red header running along right wall at ceiling height */}
+      <Pipe from={[17, 6.5, -11]} to={[17, 6.5, 11]} radius={0.1} material={redPipeMat} />
+      <Pipe from={[16.5, 6.5, -11]} to={[16.5, 6.5, 11]} radius={0.08} material={redPipeMat} />
+      {/* Red vertical risers from ceiling to floor */}
+      {[-8, -4, 0, 4, 8].map((z, i) => (
+        <group key={`red-riser-${i}`}>
+          <Pipe from={[17, 0.5, z]} to={[17, 6.5, z]} radius={0.06} material={redPipeMat} />
+          <Elbow pos={[17, 6.5, z]} radius={0.08} material={redPipeMat} />
+        </group>
+      ))}
+      {/* Red cross-runs from right wall to center */}
+      {[-6, -2, 2, 6].map((z, i) => (
+        <Pipe key={`red-cross-${i}`} from={[17, 6.2, z]} to={[5, 6.2, z]} radius={0.05} material={redPipeMat} />
+      ))}
+      {/* Red pipes running along back wall */}
+      <Pipe from={[-17, 5.8, -11.5]} to={[17, 5.8, -11.5]} radius={0.09} material={redPipeMat} />
+      <Pipe from={[-17, 5.5, -11.5]} to={[17, 5.5, -11.5]} radius={0.07} material={redPipeMat} />
+      {/* Red external pipes going outside */}
+      <Pipe from={[18, 5.8, -5]} to={[22, 5.8, -5]} radius={0.09} material={redPipeMat} />
+      <Pipe from={[22, 5.8, -5]} to={[22, 1, -5]} radius={0.09} material={redPipeMat} />
+      <Elbow pos={[22, 5.8, -5]} radius={0.12} material={redPipeMat} />
+      <Elbow pos={[22, 1, -5]} radius={0.12} material={redPipeMat} />
+      <Pipe from={[18, 5.5, -3]} to={[22, 5.5, -3]} radius={0.07} material={redPipeMat} />
+      <Pipe from={[22, 5.5, -3]} to={[22, 1.5, -3]} radius={0.07} material={redPipeMat} />
+      <Elbow pos={[22, 5.5, -3]} radius={0.09} material={redPipeMat} />
+
+      {/* ═══════════════ BLUE PIPES — CHILLED WATER SUPPLY ═══════════════ */}
+      {/* Main blue headers running down the center at ceiling */}
+      <Pipe from={[-17, 7.0, 0]} to={[17, 7.0, 0]} radius={0.12} material={bluePipeMat} />
+      <Pipe from={[-17, 6.7, 0.4]} to={[17, 6.7, 0.4]} radius={0.09} material={bluePipeMat} />
+      <Pipe from={[-17, 7.0, -0.4]} to={[17, 7.0, -0.4]} radius={0.07} material={bluePipeMat} />
+      {/* Blue branch lines going to rack rows */}
+      {[-4.5, -1.5, 2.5].map((x, i) => (
+        <group key={`blue-branch-${i}`}>
+          <Pipe from={[x, 7.0, 0]} to={[x, 7.0, -10]} radius={0.06} material={bluePipeMat} />
+          <Pipe from={[x, 7.0, 0]} to={[x, 7.0, 10]} radius={0.06} material={bluePipeMat} />
+          <Elbow pos={[x, 7.0, 0]} radius={0.08} material={bluePipeMat} />
+          {/* Vertical drops */}
+          <Pipe from={[x, 4, -8]} to={[x, 7.0, -8]} radius={0.04} material={bluePipeMat} />
+          <Pipe from={[x, 4, 8]} to={[x, 7.0, 8]} radius={0.04} material={bluePipeMat} />
+          <Elbow pos={[x, 7.0, -8]} radius={0.06} material={bluePipeMat} />
+          <Elbow pos={[x, 7.0, 8]} radius={0.06} material={bluePipeMat} />
+        </group>
+      ))}
+      {/* Blue external connection */}
+      <Pipe from={[18, 7.0, 0]} to={[24, 7.0, 0]} radius={0.12} material={bluePipeMat} />
+      <Pipe from={[24, 7.0, 0]} to={[24, 0.5, 0]} radius={0.12} material={bluePipeMat} />
+      <Elbow pos={[24, 7.0, 0]} radius={0.15} material={bluePipeMat} />
+      <Elbow pos={[24, 0.5, 0]} radius={0.15} material={bluePipeMat} />
+      {/* Blue external horizontal at ground level */}
+      <Pipe from={[24, 0.5, 0]} to={[24, 0.5, -14]} radius={0.12} material={bluePipeMat} />
+      <Pipe from={[24, 0.5, 0]} to={[24, 0.5, 8]} radius={0.09} material={bluePipeMat} />
+
+      {/* ═══════════════ ORANGE PIPES — ELECTRICAL CONDUIT ═══════════════ */}
+      {/* Orange conduit running along left wall outside */}
+      <Pipe from={[-19, 1.2, -14]} to={[-19, 1.2, 14]} radius={0.08} material={orangePipeMat} />
+      <Pipe from={[-19, 1.8, -14]} to={[-19, 1.8, 14]} radius={0.06} material={orangePipeMat} />
+      <Pipe from={[-19, 2.4, -14]} to={[-19, 2.4, 14]} radius={0.06} material={orangePipeMat} />
+      {/* Orange vertical risers on exterior */}
+      {[-10, -5, 0, 5, 10].map((z, i) => (
+        <group key={`orange-riser-${i}`}>
+          <Pipe from={[-19, 0.3, z]} to={[-19, 3.5, z]} radius={0.04} material={orangePipeMat} />
+          <Elbow pos={[-19, 1.2, z]} radius={0.06} material={orangePipeMat} />
+          <Elbow pos={[-19, 1.8, z]} radius={0.05} material={orangePipeMat} />
+          <Elbow pos={[-19, 2.4, z]} radius={0.05} material={orangePipeMat} />
+        </group>
+      ))}
+      {/* Orange conduit entering building at multiple points */}
+      {[-8, -3, 3, 8].map((z, i) => (
+        <Pipe key={`orange-entry-${i}`} from={[-19, 1.2, z]} to={[-17.5, 1.2, z]} radius={0.05} material={orangePipeMat} />
+      ))}
+      {/* Orange along floor inside left zone */}
+      <Pipe from={[-17, 0.3, -10]} to={[-17, 0.3, 10]} radius={0.06} material={orangePipeMat} />
+
+      {/* ═══════════════ CYAN PIPES — COOLING WATER RETURN ═══════════════ */}
+      {/* Cyan parallel to blue at ceiling, offset */}
+      <Pipe from={[-17, 6.3, 1.5]} to={[17, 6.3, 1.5]} radius={0.1} material={cyanPipeMat} />
+      <Pipe from={[-17, 6.0, 1.8]} to={[17, 6.0, 1.8]} radius={0.07} material={cyanPipeMat} />
+      {/* Cyan branch lines */}
+      {[-6, 0, 6].map((z, i) => (
+        <Pipe key={`cyan-cross-${i}`} from={[-10, 6.3, 1.5]} to={[-10, 6.3, z + 1.5]} radius={0.05} material={cyanPipeMat} />
+      ))}
+      {/* Cyan external run along bottom outside */}
+      <Pipe from={[-20, 0.5, -14]} to={[-20, 0.5, 14]} radius={0.1} material={cyanPipeMat} />
+      <Pipe from={[-20, 0.5, -14]} to={[-20, 3, -14]} radius={0.08} material={cyanPipeMat} />
+      <Elbow pos={[-20, 3, -14]} radius={0.1} material={cyanPipeMat} />
+      <Pipe from={[-20, 3, -14]} to={[-18, 3, -14]} radius={0.08} material={cyanPipeMat} />
+      {/* Cyan along right side bottom */}
+      <Pipe from={[19, 0.5, -14]} to={[19, 0.5, 14]} radius={0.08} material={cyanPipeMat} />
+      <Pipe from={[19, 0.5, -14]} to={[24, 0.5, -14]} radius={0.08} material={cyanPipeMat} />
+
+      {/* ═══════════════ GREEN PIPES — DRAIN / CONDENSATE ═══════════════ */}
+      {/* Green pipes at lower level inside the building */}
+      <Pipe from={[-15, 0.3, -10]} to={[-15, 0.3, 10]} radius={0.05} material={greenPipeMat} />
+      <Pipe from={[-15, 0.3, -10]} to={[-15, 0.3, -13]} radius={0.05} material={greenPipeMat} />
+      {/* Green condensate lines running under racks */}
+      {[-4.5, -1.5].map((x, i) => (
+        <group key={`green-under-${i}`}>
+          <Pipe from={[x, 0.15, -9]} to={[x, 0.15, 9]} radius={0.03} material={greenPipeMat} />
+          {[-6, -2, 2, 6].map((z, j) => (
+            <Pipe key={`green-t-${j}`} from={[x, 0.15, z]} to={[x - 1, 0.15, z]} radius={0.025} material={greenPipeMat} />
+          ))}
+        </group>
+      ))}
+      {/* Green external drainage */}
+      <Pipe from={[-20, 0.15, 10]} to={[-20, 0.15, -14]} radius={0.06} material={greenPipeMat} />
+      <Pipe from={[-15, 0.15, -13]} to={[-20, 0.15, -13]} radius={0.05} material={greenPipeMat} />
+      <Elbow pos={[-20, 0.15, -13]} radius={0.07} material={greenPipeMat} />
+
+      {/* ═══════════════ MAGENTA PIPES — SPECIALTY / FIRE SUPPRESSION GAS ═══════════════ */}
+      {/* Magenta pipes going to specific zones */}
+      <Pipe from={[7, 5.0, -7]} to={[14, 5.0, -7]} radius={0.04} material={magentaPipeMat} />
+      <Pipe from={[14, 5.0, -7]} to={[14, 5.0, 7]} radius={0.04} material={magentaPipeMat} />
+      <Elbow pos={[14, 5.0, -7]} radius={0.06} material={magentaPipeMat} />
+      <Elbow pos={[14, 5.0, 7]} radius={0.06} material={magentaPipeMat} />
+      <Pipe from={[14, 5.0, 7]} to={[14, 2.0, 7]} radius={0.04} material={magentaPipeMat} />
+      {/* Magenta cross lines at ceiling */}
+      <Pipe from={[-8, 5.5, -9]} to={[8, 5.5, -9]} radius={0.035} material={magentaPipeMat} />
+      <Pipe from={[-8, 5.5, 9]} to={[8, 5.5, 9]} radius={0.035} material={magentaPipeMat} />
+      {/* Magenta drops to sprinkler zones */}
+      {[-6, -3, 0, 3, 6].map((x, i) => (
+        <group key={`mag-drop-${i}`}>
+          <Pipe from={[x, 5.5, -9]} to={[x, 4.5, -9]} radius={0.025} material={magentaPipeMat} />
+          <Pipe from={[x, 5.5, 9]} to={[x, 4.5, 9]} radius={0.025} material={magentaPipeMat} />
+        </group>
+      ))}
+
+      {/* ═══════════════ BROWN PIPES — GAS / FUEL LINES ═══════════════ */}
+      <Pipe from={[-16, 0.6, 4]} to={[-16, 0.6, -11]} radius={0.04} material={brownPipeMat} />
+      <Pipe from={[-16, 0.6, -11]} to={[-16, 3, -11]} radius={0.04} material={brownPipeMat} />
+      <Elbow pos={[-16, 0.6, -11]} radius={0.05} material={brownPipeMat} />
+      <Elbow pos={[-16, 3, -11]} radius={0.05} material={brownPipeMat} />
+      <Pipe from={[-16, 3, -11]} to={[-19, 3, -11]} radius={0.04} material={brownPipeMat} />
+
+      {/* ═══════════════ HVAC RECTANGULAR DUCTS ═══════════════ */}
+      {/* Main HVAC supply duct at ceiling */}
+      <Duct position={[0, 7.2, -5]} size={[30, 0.6, 0.8]} material={whiteDuctMat} />
+      <Duct position={[0, 7.2, 5]} size={[30, 0.6, 0.8]} material={whiteDuctMat} />
+      {/* HVAC branch ducts going across */}
+      {[-12, -6, 0, 6, 12].map((x, i) => (
+        <group key={`hvac-branch-${i}`}>
+          <Duct position={[x, 7.2, 0]} size={[0.5, 0.4, 10]} material={whiteDuctMat} />
+          {/* Diffuser outlets */}
+          <Duct position={[x, 7.0, -3]} size={[0.6, 0.15, 0.6]} material={darkSteelMat} />
+          <Duct position={[x, 7.0, 3]} size={[0.6, 0.15, 0.6]} material={darkSteelMat} />
+        </group>
+      ))}
+      {/* Roof HVAC units (white boxes with fans) */}
+      {[-8, -2, 4, 10].map((x, i) => (
+        <group key={`roof-ahu-${i}`} position={[x, 7.8, -8]}>
+          <mesh position={[0, 0.5, 0]} material={whiteDuctMat} castShadow>
+            <boxGeometry args={[3, 1.0, 2.0]} />
+          </mesh>
+          {/* Fan units on top */}
+          {[-0.8, 0.8].map((fx, fi) => (
+            <mesh key={fi} position={[fx, 1.1, 0]} rotation={[-Math.PI / 2, 0, 0]} material={darkSteelMat}>
+              <cylinderGeometry args={[0.35, 0.35, 0.15, 16]} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      {/* Roof HVAC units on opposite side */}
+      {[-6, 0, 6, 12].map((x, i) => (
+        <group key={`roof-ahu2-${i}`} position={[x, 7.8, 8]}>
+          <mesh position={[0, 0.4, 0]} material={whiteDuctMat} castShadow>
+            <boxGeometry args={[2.5, 0.8, 1.8]} />
+          </mesh>
+          <mesh position={[0, 0.9, 0]} rotation={[-Math.PI / 2, 0, 0]} material={darkSteelMat}>
+            <cylinderGeometry args={[0.4, 0.4, 0.12, 16]} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* ═══════════════ YELLOW CABLE TRAYS WITH BLUE CABLES ═══════════════ */}
+      {/* Multiple cable tray runs overhead */}
+      {[-4.5, -1.5, 2.5].map((x, i) => (
+        <group key={`tray-row-${i}`}>
+          {/* Yellow tray body */}
+          <mesh position={[x, 5.8, 0]} material={yellowTrayMat}>
+            <boxGeometry args={[0.5, 0.08, 20]} />
+          </mesh>
+          {/* Tray side rails */}
+          <mesh position={[x - 0.25, 5.85, 0]} material={yellowTrayMat}>
+            <boxGeometry args={[0.03, 0.1, 20]} />
+          </mesh>
+          <mesh position={[x + 0.25, 5.85, 0]} material={yellowTrayMat}>
+            <boxGeometry args={[0.03, 0.1, 20]} />
+          </mesh>
+          {/* Blue cable bundles in tray */}
+          {[-0.12, -0.04, 0.04, 0.12].map((offset, ci) => (
+            <mesh key={ci} position={[x + offset, 5.86, 0]} rotation={[Math.PI / 2, 0, 0]} material={bluePipeMat}>
+              <cylinderGeometry args={[0.025, 0.025, 19.5, 8]} />
+            </mesh>
+          ))}
+          {/* Suspension rods */}
+          {[-8, -4, 0, 4, 8].map((z, si) => (
+            <mesh key={si} position={[x, 6.5, z]}>
+              <cylinderGeometry args={[0.012, 0.012, 1.4, 6]} />
+              <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.1} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+
+      {/* Main cross-aisle cable tray */}
+      <mesh position={[0, 6.5, 0]} material={yellowTrayMat}>
+        <boxGeometry args={[0.6, 0.08, 22]} />
+      </mesh>
+      {/* Cables in cross tray */}
+      {[-0.15, -0.05, 0.05, 0.15].map((offset, ci) => (
+        <mesh key={`cross-cable-${ci}`} position={[offset, 6.55, 0]} rotation={[Math.PI / 2, 0, 0]} material={bluePipeMat}>
+          <cylinderGeometry args={[0.022, 0.022, 21.5, 8]} />
+        </mesh>
+      ))}
+
+      {/* ═══════════════ EXTERNAL UTILITY YARD ═══════════════ */}
+      {/* External pipe rack structure (steel frame) */}
+      {[-22, -20].map((x, i) => (
+        <group key={`ext-rack-${i}`}>
+          {[-10, -5, 0, 5, 10].map((z, j) => (
+            <mesh key={j} position={[x, 1.5, z]} material={darkSteelMat}>
+              <cylinderGeometry args={[0.04, 0.04, 3, 8]} />
+            </mesh>
+          ))}
+          <mesh position={[x, 3, 0]} rotation={[Math.PI / 2, 0, 0]} material={darkSteelMat}>
+            <cylinderGeometry args={[0.03, 0.03, 20, 8]} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* External cable tray below */}
+      <mesh position={[-21, 0.3, 0]} material={darkSteelMat}>
+        <boxGeometry args={[2, 0.04, 22]} />
+      </mesh>
+
+      {/* ═══════════════ ADDITIONAL PIPE RUNS FOR DENSITY ═══════════════ */}
+      {/* Parallel red/blue pairs at intermediate heights along walls */}
+      <Pipe from={[-17, 4.0, -11]} to={[10, 4.0, -11]} radius={0.045} material={redPipeMat} />
+      <Pipe from={[-17, 3.7, -11]} to={[10, 3.7, -11]} radius={0.04} material={bluePipeMat} />
+      <Pipe from={[-17, 4.0, 11]} to={[10, 4.0, 11]} radius={0.045} material={redPipeMat} />
+      <Pipe from={[-17, 3.7, 11]} to={[10, 3.7, 11]} radius={0.04} material={bluePipeMat} />
+      
+      {/* Overhead valve clusters (cylinder + sphere joints) */}
+      {[-8, 0, 8].map((z, i) => (
+        <group key={`valve-${i}`}>
+          <Elbow pos={[17, 6.5, z]} radius={0.12} material={darkSteelMat} />
+          <Elbow pos={[-17, 7.0, z * 0.5]} radius={0.1} material={darkSteelMat} />
+        </group>
+      ))}
+
+      {/* Extra pipe runs for density: interleaved colored pipes */}
+      {/* Secondary orange run at mid-height */}
+      <Pipe from={[-12, 3.0, -10]} to={[-12, 3.0, 10]} radius={0.04} material={orangePipeMat} />
+      <Pipe from={[-12, 3.3, -10]} to={[-12, 3.3, 10]} radius={0.035} material={orangePipeMat} />
+      {/* Secondary cyan run */}
+      <Pipe from={[12, 4.5, -10]} to={[12, 4.5, 10]} radius={0.05} material={cyanPipeMat} />
+      <Pipe from={[12, 4.8, -10]} to={[12, 4.8, 10]} radius={0.04} material={cyanPipeMat} />
+      {/* Additional green low-level runs */}
+      <Pipe from={[5, 0.2, -10]} to={[5, 0.2, 10]} radius={0.03} material={greenPipeMat} />
+      <Pipe from={[-8, 0.2, -10]} to={[-8, 0.2, 10]} radius={0.03} material={greenPipeMat} />
+
+      {/* Cross-connects between systems */}
+      {[-7, -3, 1, 5, 9].map((z, i) => (
+        <group key={`cross-connect-${i}`}>
+          <Pipe from={[-12, 3.0, z]} to={[-8, 3.0, z]} radius={0.03} material={orangePipeMat} />
+          <Pipe from={[12, 4.5, z]} to={[14, 4.5, z]} radius={0.03} material={cyanPipeMat} />
+        </group>
+      ))}
+
+      {/* ═══════════════ LABELS ═══════════════ */}
+      <Html position={[17, 7.2, 0]} center distanceFactor={22} style={{ pointerEvents: 'none' }}>
+        <div style={{
+          fontSize: '7px', fontWeight: 800, color: '#fca5a5',
+          background: 'rgba(127,29,29,0.92)', padding: '2px 8px', borderRadius: '4px',
+          border: '1px solid rgba(239,68,68,0.5)', whiteSpace: 'nowrap',
+        }}>
+          🔴 HOT WATER SUPPLY + FIRE SUPPRESSION
+        </div>
+      </Html>
+      <Html position={[0, 7.6, 0]} center distanceFactor={22} style={{ pointerEvents: 'none' }}>
+        <div style={{
+          fontSize: '7px', fontWeight: 800, color: '#93c5fd',
+          background: 'rgba(30,58,138,0.92)', padding: '2px 8px', borderRadius: '4px',
+          border: '1px solid rgba(37,99,235,0.5)', whiteSpace: 'nowrap',
+        }}>
+          🔵 CHILLED WATER SUPPLY HEADER
+        </div>
+      </Html>
+      <Html position={[-19, 3.5, 0]} center distanceFactor={22} style={{ pointerEvents: 'none' }}>
+        <div style={{
+          fontSize: '7px', fontWeight: 800, color: '#fb923c',
+          background: 'rgba(124,45,18,0.92)', padding: '2px 8px', borderRadius: '4px',
+          border: '1px solid rgba(234,88,12,0.5)', whiteSpace: 'nowrap',
+        }}>
+          🟠 ELECTRICAL CONDUIT
+        </div>
+      </Html>
+      <Html position={[-20, 1.5, 14]} center distanceFactor={22} style={{ pointerEvents: 'none' }}>
+        <div style={{
+          fontSize: '7px', fontWeight: 800, color: '#67e8f9',
+          background: 'rgba(8,51,68,0.92)', padding: '2px 8px', borderRadius: '4px',
+          border: '1px solid rgba(6,182,212,0.5)', whiteSpace: 'nowrap',
+        }}>
+          🔹 COOLING WATER RETURN
+        </div>
+      </Html>
+      <Html position={[-15, 1.0, -12]} center distanceFactor={22} style={{ pointerEvents: 'none' }}>
+        <div style={{
+          fontSize: '7px', fontWeight: 800, color: '#86efac',
+          background: 'rgba(20,83,45,0.92)', padding: '2px 8px', borderRadius: '4px',
+          border: '1px solid rgba(22,163,74,0.5)', whiteSpace: 'nowrap',
+        }}>
+          🟢 CONDENSATE DRAIN
+        </div>
+      </Html>
+      <Html position={[14, 5.6, 0]} center distanceFactor={22} style={{ pointerEvents: 'none' }}>
+        <div style={{
+          fontSize: '7px', fontWeight: 800, color: '#f0abfc',
+          background: 'rgba(112,26,117,0.92)', padding: '2px 8px', borderRadius: '4px',
+          border: '1px solid rgba(217,70,239,0.5)', whiteSpace: 'nowrap',
+        }}>
+          🟣 FIRE SUPPRESSION GAS
+        </div>
+      </Html>
+      <Html position={[0, 7.8, -5]} center distanceFactor={22} style={{ pointerEvents: 'none' }}>
+        <div style={{
+          fontSize: '7px', fontWeight: 800, color: '#f1f5f9',
+          background: 'rgba(15,23,42,0.92)', padding: '2px 8px', borderRadius: '4px',
+          border: '1px solid rgba(226,232,240,0.4)', whiteSpace: 'nowrap',
+        }}>
+          ⬜ HVAC SUPPLY DUCTS
+        </div>
+      </Html>
+    </group>
+  )
+}
+
 /* ─────────────────── PROFESSIONAL DATACENTER PIPELINES & AIRFLOW (REFERENCE IMAGE STYLE) ─────────────────── */
 function ProfessionalDatacenterPipelines() {
   const copperPipeMat = useMemo(() => new THREE.MeshStandardMaterial({
@@ -1482,9 +1879,8 @@ function OverheadCableTray({ rackPositions }) {
     <group>
       {/* ── 1. YELLOW FIBER RUNNER OVERHEAD DUCT (MAIN AISLE TRUNK AT Y=6.4) ── */}
       {/* Main longitudinal yellow trough */}
-      <mesh position={[0, 6.4, 0]}>
+      <mesh position={[0, 6.4, 0]} material={yellowRacewayMat}>
         <boxGeometry args={[0.6, 0.25, 22]} />
-        <primitive object={yellowRacewayMat} />
       </mesh>
       {/* Yellow trough inner channel recess */}
       <mesh position={[0, 6.48, 0]}>
@@ -1494,14 +1890,12 @@ function OverheadCableTray({ rackPositions }) {
       {/* Yellow T-junction fittings over server rows */}
       {serverRowX.map((x, i) => (
         <group key={`t-junction-${i}`} position={[x / 2, 6.4, 0]}>
-          <mesh position={[0, 0, 0]}>
+          <mesh position={[0, 0, 0]} material={yellowRacewayMat}>
             <boxGeometry args={[Math.abs(x), 0.26, 0.65]} />
-            <primitive object={yellowRacewayMat} />
           </mesh>
           {/* Vertical yellow drop chute into rack row */}
-          <mesh position={[x / 2, -0.4, 0]}>
+          <mesh position={[x / 2, -0.4, 0]} material={yellowRacewayMat}>
             <boxGeometry args={[0.5, 0.6, 0.5]} />
-            <primitive object={yellowRacewayMat} />
           </mesh>
         </group>
       ))}
@@ -1520,20 +1914,17 @@ function OverheadCableTray({ rackPositions }) {
       {serverRowX.map((rx, ri) => (
         <group key={`ladder-${ri}`}>
           {/* Side rails of cable ladder */}
-          <mesh position={[rx - 0.3, 5.6, 0]}>
+          <mesh position={[rx - 0.3, 5.6, 0]} material={ladderSteelMat}>
             <boxGeometry args={[0.04, 0.12, 20]} />
-            <primitive object={ladderSteelMat} />
           </mesh>
-          <mesh position={[rx + 0.3, 5.6, 0]}>
+          <mesh position={[rx + 0.3, 5.6, 0]} material={ladderSteelMat}>
             <boxGeometry args={[0.04, 0.12, 20]} />
-            <primitive object={ladderSteelMat} />
           </mesh>
 
           {/* Ladder cross rungs spaced along the tray */}
           {Array.from({ length: 20 }).map((_, rungi) => (
-            <mesh key={`rung-${rungi}`} position={[rx, 5.56, -9.5 + rungi * 1.0]}>
+            <mesh key={`rung-${rungi}`} position={[rx, 5.56, -9.5 + rungi * 1.0]} material={ladderSteelMat}>
               <boxGeometry args={[0.6, 0.03, 0.04]} />
-              <primitive object={ladderSteelMat} />
             </mesh>
           ))}
 
@@ -1549,16 +1940,14 @@ function OverheadCableTray({ rackPositions }) {
           {[-0.18, -0.06, 0.06, 0.18].map((cableOffset, ci) => (
             <group key={`bundle-${ci}`}>
               {/* Longitudinal blue cable bundle tube */}
-              <mesh position={[rx + cableOffset, 5.64, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <mesh position={[rx + cableOffset, 5.64, 0]} rotation={[Math.PI / 2, 0, 0]} material={blueCableMat}>
                 <cylinderGeometry args={[0.028, 0.028, 19.6, 12]} />
-                <primitive object={blueCableMat} />
               </mesh>
 
               {/* Black velcro tie wraps bundled tightly around cables (Image 1 Style) */}
               {Array.from({ length: 16 }).map((_, tiei) => (
-                <mesh key={`tie-${tiei}`} position={[rx + cableOffset, 5.64, -9.0 + tiei * 1.2]} rotation={[Math.PI / 2, 0, 0]}>
+                <mesh key={`tie-${tiei}`} position={[rx + cableOffset, 5.64, -9.0 + tiei * 1.2]} rotation={[Math.PI / 2, 0, 0]} material={velcroTieMat}>
                   <cylinderGeometry args={[0.034, 0.034, 0.04, 10]} />
-                  <primitive object={velcroTieMat} />
                 </mesh>
               ))}
             </group>
@@ -1567,14 +1956,12 @@ function OverheadCableTray({ rackPositions }) {
           {/* Vertical cable drop loops from ladder tray down into top of each GPU server host */}
           {[-4, 0, 4].map((gz, gi) => (
             <group key={`drop-cable-${gi}`} position={[rx, 5.4, gz]}>
-              <mesh position={[0, -0.2, 0]}>
+              <mesh position={[0, -0.2, 0]} material={blueCableMat}>
                 <cylinderGeometry args={[0.08, 0.08, 0.4, 12]} />
-                <primitive object={blueCableMat} />
               </mesh>
               {/* Black velcro strap on vertical drop */}
-              <mesh position={[0, -0.2, 0]}>
+              <mesh position={[0, -0.2, 0]} material={velcroTieMat}>
                 <cylinderGeometry args={[0.095, 0.095, 0.05, 10]} />
-                <primitive object={velcroTieMat} />
               </mesh>
             </group>
           ))}
@@ -2342,6 +2729,7 @@ function ControlCenter({ theme = 'light', isActive = true }) {
   const [genActive, setGenActive] = useState(false)
   const [batteryCharging, setBatteryCharging] = useState(true)
   const [showThermal, setShowThermal] = useState(false)
+  const [showPipelineModel, setShowPipelineModel] = useState(false)
   const isDarkMode = false
 
   const [logEntries, setLogEntries] = useState([
@@ -2598,6 +2986,7 @@ function ControlCenter({ theme = 'light', isActive = true }) {
           <HeatGlowHalos rackPositions={rackPosArray} gpuTemps={gpuTemps} visible={showThermal} />
           <FireSuppression />
           <QuantumInterconnect />
+          <BIMPipelineModel visible={showPipelineModel} />
           {serversList.map(rack => (
             <ServerRack
               key={rack.id}
@@ -2701,6 +3090,31 @@ function ControlCenter({ theme = 'light', isActive = true }) {
               >
                 {showThermal ? <Eye size={10} /> : <EyeOff size={10} />}
                 THERMAL {showThermal ? 'ON' : 'OFF'}
+              </button>
+
+              {/* BIM Pipeline 3D Infrastructure Model Toggle */}
+              <button
+                onClick={() => setShowPipelineModel(prev => !prev)}
+                className="cc-panel-hover"
+                title="Toggle BIM MEP Pipeline 3D Architecture Model"
+                style={{
+                  background: showPipelineModel ? 'rgba(37,99,235,0.2)' : (isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)'),
+                  border: `1px solid ${showPipelineModel ? 'rgba(37,99,235,0.6)' : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.15)')}`,
+                  color: showPipelineModel ? '#2563eb' : (isDarkMode ? '#8b949e' : '#475569'),
+                  borderRadius: '3px',
+                  padding: '2px 8px',
+                  fontSize: '0.55rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: showPipelineModel ? '0 0 10px rgba(37,99,235,0.3)' : 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <Cable size={10} color={showPipelineModel ? '#2563eb' : undefined} />
+                PIPELINES / BIM {showPipelineModel ? 'ON' : 'OFF'}
               </button>
 
               {genActive && (
