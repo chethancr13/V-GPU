@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import CatWalker from './components/PixelCatWalker'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MetricsProvider } from './contexts/MetricsContext'
 import {
@@ -122,6 +123,9 @@ function App() {
   }, [])
 
   const isDark = theme === 'dark'
+
+  // Cat walker easter egg
+  const [showCat, setShowCat] = useState(false)
 
   //  Navigation Tabs 
   const tabs = [
@@ -348,6 +352,40 @@ function App() {
                   {isDark ? <Sun size={16} /> : <Moon size={16} />}
                 </button>
 
+                {/* Cat Walker Toggle Button */}
+                <button
+                  onClick={() => setShowCat(prev => !prev)}
+                  title={showCat ? 'Stop the cat 🛑' : 'Release the cat! 🐱'}
+                  style={{
+                    background: showCat ? '#D4A36A' : 'var(--gray)',
+                    border: showCat ? '1px solid #D4A36A' : '1px solid var(--border)',
+                    color: showCat ? '#fff' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '6px',
+                    transition: 'all 0.25s ease',
+                    fontSize: '16px',
+                    transform: showCat ? 'scale(1.1)' : 'scale(1)',
+                    boxShadow: showCat ? '0 0 14px rgba(212, 163, 106, 0.6)' : 'none',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = '#D4A36A'
+                    e.currentTarget.style.boxShadow = '0 0 10px rgba(212, 163, 106, 0.4)'
+                    e.currentTarget.style.transform = 'scale(1.15)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = showCat ? '#D4A36A' : 'var(--border)'
+                    e.currentTarget.style.boxShadow = showCat ? '0 0 14px rgba(212, 163, 106, 0.6)' : 'none'
+                    e.currentTarget.style.transform = showCat ? 'scale(1.1)' : 'scale(1)'
+                  }}
+                >
+                  🐾
+                </button>
+
                 <button style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex' }}>
                   <HelpCircle size={18} />
                 </button>
@@ -396,6 +434,9 @@ function App() {
             <Suspense fallback={null}>
               <AIComparisonAgent setActiveTab={setActiveTab} />
             </Suspense>
+
+            {/* Cat Walker Easter Egg */}
+            <CatWalker isWalking={showCat} onStop={() => setShowCat(false)} />
           </div>
         </div>
       </MetricsProvider>
