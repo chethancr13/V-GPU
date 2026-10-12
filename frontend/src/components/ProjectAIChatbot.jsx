@@ -228,7 +228,7 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
   const [loading, setLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [indexStats, setIndexStats] = useState({ total_files: 0, total_chunks: 0, last_synced: 0 })
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('vgpu-gemini-key') || '')
+  const [ollamaStatus, setOllamaStatus] = useState({ running: false, models: [], active_model: 'qwen2.5:latest' })
   const [showSettings, setShowSettings] = useState(false)
   const [selectedCitation, setSelectedCitation] = useState(null)
   const [sessionId, setSessionId] = useState(() => 'session_' + Math.random().toString(36).substring(2, 9))
@@ -382,7 +382,7 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  // Poll live metrics every 5 seconds only when active
+  // Poll live metrics and Ollama status every 5 seconds only when active
   useEffect(() => {
     if (!isActive) return
     const fetchMetrics = async () => {
@@ -396,8 +396,23 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
         // Silently catch
       }
     }
+    const fetchOllama = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/api/ollama/status')
+        if (res.ok) {
+          const data = await res.json()
+          setOllamaStatus(data)
+        }
+      } catch (e) {
+        // Silently catch
+      }
+    }
     fetchMetrics()
-    const interval = setInterval(fetchMetrics, 5000)
+    fetchOllama()
+    const interval = setInterval(() => {
+      fetchMetrics()
+      fetchOllama()
+    }, 5000)
     return () => clearInterval(interval)
   }, [isActive])
 
@@ -440,7 +455,7 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
         id: 'msg-welcome',
         sender: 'assistant',
         time: '09:25',
-        text: `👋 **Welcome to the V-GPU Project AI Assistant!**\n\nI am directly connected to your codebase and real-time hardware telemetry:\n\n- **Project RAG**: Grounded in architecture, scheduler logic, and virtualization modules\n- **Live Hardware Telemetry**: Monitored GPU temps, utilization, power, and VRAM\n- **Unified AI Engine**: Natural language analysis powered by offline RAG or Gemini\n\nAsk me about cluster state, code implementation, or platform architecture!`,
+        text: `👋 **Welcome to the V-GPU Project AI Assistant!**\n\nI am directly connected to your codebase and real-time hardware telemetry:\n\n- **Project RAG**: Grounded in architecture, scheduler logic, and virtualization modules\n- **Live Hardware Telemetry**: Monitored GPU temps, utilization, power, and VRAM\n- **Unified AI Engine**: Natural language analysis powered by **Local Qwen 2.5 (Ollama)**\n\nAsk me about cluster state, water & power metrics, or platform architecture!`,
         citations: []
       }
     ])
@@ -489,8 +504,7 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
     setSyncing(true)
     try {
       const res = await fetch('http://localhost:8000/api/chatbot/index/resync', {
-        method: 'POST',
-        headers: { 'X-Gemini-Key': apiKey }
+        method: 'POST'
       })
       if (res.ok) {
         const stats = await res.json()
@@ -567,13 +581,11 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
         const res = await fetch('http://localhost:8000/api/chat', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'X-Gemini-Key': apiKey
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             message: messageToSend,
             session_id: sessionId,
-            api_key: apiKey,
             history: messages.slice(-6).map(m => ({
               role: m.sender === 'user' ? 'user' : 'model',
               content: m.text
@@ -586,13 +598,11 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
         const res = await fetch('http://localhost:8000/api/chatbot/query', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'X-Gemini-Key': apiKey
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             message: messageToSend,
-            session_id: sessionId,
-            api_key: apiKey
+            session_id: sessionId
           })
         })
         if (!res.ok) throw new Error('Failed to query RAG Engine')
@@ -602,13 +612,11 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
           const fallbackRes = await fetch('http://localhost:8000/api/chat', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
-              'X-Gemini-Key': apiKey
+              'Content-Type': 'application/json'
             },
             body: JSON.stringify({
               message: messageToSend,
               session_id: sessionId,
-              api_key: apiKey,
               history: messages.slice(-6).map(m => ({
                 role: m.sender === 'user' ? 'user' : 'model',
                 content: m.text
@@ -678,13 +686,6 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
     link.click()
     document.body.removeChild(link)
     showToast('💾 Chat conversation exported as Markdown.')
-  }
-
-  const handleSaveKey = (e) => {
-    e.preventDefault()
-    localStorage.setItem('vgpu-gemini-key', apiKey)
-    setShowSettings(false)
-    showToast('Gemini API key saved!')
   }
 
   // Markdown Formatter with high-contrast styling and copy button
@@ -1080,14 +1081,14 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
             US
           </div>
 
-          {/* Settings Button: Gemini Key */}
+          {/* Settings Button: Local Qwen Status */}
           <button
             onClick={() => setShowSettings(true)}
-            title="Gemini API Key & AI Settings"
+            title="Local Qwen AI Engine Settings"
             style={{
-              background: apiKey ? 'rgba(59, 130, 246, 0.1)' : 'none',
-              border: apiKey ? '1px solid rgba(59, 130, 246, 0.3)' : 'none',
-              color: apiKey ? '#3b82f6' : 'var(--text-secondary, #64748b)',
+              background: 'rgba(118, 185, 0, 0.1)',
+              border: '1px solid rgba(118, 185, 0, 0.3)',
+              color: '#76B900',
               padding: '6px',
               borderRadius: '6px',
               cursor: 'pointer'
@@ -1447,17 +1448,17 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
 
               <button
                 onClick={() => setShowSettings(true)}
-                title="Gemini API Key Settings"
+                title="Local Qwen 2.5 Settings"
                 style={{
-                  background: apiKey ? 'rgba(59, 130, 246, 0.1)' : 'var(--gray, #f1f5f9)',
-                  border: '1px solid var(--border, rgba(0,0,0,0.08))',
-                  color: apiKey ? '#3b82f6' : 'inherit',
+                  background: 'rgba(118, 185, 0, 0.1)',
+                  border: '1px solid rgba(118, 185, 0, 0.3)',
+                  color: '#76B900',
                   padding: '6px 8px',
                   cursor: 'pointer',
                   borderRadius: '6px'
                 }}
               >
-                <Key size={15} />
+                <Bot size={15} />
               </button>
             </div>
           </div>
@@ -2071,50 +2072,42 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Key size={18} color="#76B900" />
-                Gemini API Key Settings
+                <Bot size={18} color="#76B900" />
+                Local Qwen 2.5 AI Assistant
               </h3>
               <button onClick={() => setShowSettings(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted, #94a3b8)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary, #64748b)', lineHeight: '1.5', marginBottom: '1.25rem' }}>
-              Connect your Gemini API Key to enable conversational AI synthesis. The offline RAG embeddings and live metrics function locally — the API key powers high-level conversational synthesis.
+              Your Project AI Assistant is 100% locally powered by <strong>Qwen 2.5</strong> running inside your Ollama container. Zero cloud API keys required, completely offline, and grounded in your project's codebase and real-time GPU telemetry.
             </p>
-            <form onSubmit={handleSaveKey}>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="AIzaSy..."
-                style={{
-                  width: '100%',
-                  background: 'var(--gray, #f1f5f9)',
-                  border: '1px solid var(--border, rgba(0,0,0,0.15))',
-                  borderRadius: '8px',
-                  padding: '0.75rem',
-                  color: 'var(--text-primary, #0f172a)',
-                  fontSize: '0.88rem',
-                  marginBottom: '1.25rem',
-                  outline: 'none'
-                }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
-                <button
-                  type="button"
-                  onClick={() => { setApiKey(''); localStorage.removeItem('vgpu-gemini-key'); setShowSettings(false); showToast('Key removed.'); }}
-                  style={{ background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
-                >
-                  Clear Key
-                </button>
-                <button
-                  type="submit"
-                  style={{ background: '#76B900', border: 'none', color: '#000000', fontWeight: 700, padding: '0.5rem 1.25rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
-                >
-                  Save Settings
-                </button>
-              </div>
-            </form>
+            <div style={{
+              background: 'rgba(118, 185, 0, 0.08)',
+              border: '1px solid rgba(118, 185, 0, 0.2)',
+              borderRadius: '8px',
+              padding: '0.85rem',
+              marginBottom: '1.25rem',
+              fontSize: '0.78rem',
+              color: 'var(--text-primary)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.45rem'
+            }}>
+              <div><strong>Engine:</strong> Ollama Daemon (http://localhost:11434)</div>
+              <div><strong>Active Model:</strong> <code>{ollamaStatus.active_model || 'qwen2.5:latest'}</code></div>
+              <div><strong>Installed Models:</strong> {ollamaStatus.models?.join(', ') || 'qwen2.5:latest'}</div>
+              <div><strong>Status:</strong> {ollamaStatus.running ? '🟢 Online & Grounded in Live Metrics' : '🔴 Ollama Disconnected (Using Heuristic Grounding)'}</div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowSettings(false)}
+                style={{ background: '#76B900', border: 'none', color: '#000000', fontWeight: 700, padding: '0.5rem 1.25rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

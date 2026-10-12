@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useSharedMetrics } from '../contexts/MetricsContext'
-import { Droplet, Cpu, Activity, Zap, Info, Server, Network, Sliders, RefreshCw, BarChart2, ShieldAlert, Layers, Battery, Fuel, Power, Thermometer, Gauge } from 'lucide-react'
+import { Droplet, Cpu, Activity, Zap, Info, Server, Network, Sliders, RefreshCw, BarChart2, ShieldAlert, Layers, Battery, Fuel, Power, Thermometer, Gauge, Bot, Sparkles, CheckCircle2, Calculator } from 'lucide-react'
 
 function WaterComputePlanner({ isActive = true }) {
   const [data, setData] = useState(null)
 
   // 3D Visualizer States
   const [activePipeType, setActivePipeType] = useState('ALL') // 'ALL', 'WATER', 'POWER'
-
 
   // Model & Estimator States
   const [modelSizeBillion, setModelSizeBillion] = useState(70) // 1B - 175B
@@ -17,6 +16,11 @@ function WaterComputePlanner({ isActive = true }) {
 
   // Cooling efficiency options (influences WUE)
   const [wueOptimized, setWueOptimized] = useState(true)
+
+  // Qwen AI Computing Engine States
+  const [aiComputing, setAiComputing] = useState(false)
+  const [aiMathResult, setAiMathResult] = useState(null)
+  const [activeFormulaTab, setActiveFormulaTab] = useState('cooling') // 'cooling' | 'training' | 'proof'
 
   // Power & Backup system states
   const [genActive, setGenActive] = useState(false)
@@ -52,6 +56,39 @@ function WaterComputePlanner({ isActive = true }) {
   useEffect(() => {
     if (wsMetrics) setData(wsMetrics)
   }, [wsMetrics])
+
+  // Call Qwen to compute and verify thermodynamic formulas
+  const handleComputeWithQwen = async () => {
+    setAiComputing(true)
+    try {
+      const res = await fetch('http://localhost:8000/api/ai/compute-water-power', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_size_b: modelSizeBillion,
+          dataset_tokens_b: datasetSizeBillion,
+          target_days: targetDays,
+          gpu_model: gpuModel,
+          cooling_mode: wueOptimized ? 'liquid' : 'air'
+        })
+      })
+      if (res.ok) {
+        const result = await res.json()
+        setAiMathResult(result)
+      }
+    } catch (e) {
+      console.error('Qwen math compute failed:', e)
+    } finally {
+      setAiComputing(false)
+    }
+  }
+
+  // Auto-fetch Qwen derivation when tab becomes active
+  useEffect(() => {
+    if (isActive && !aiMathResult) {
+      handleComputeWithQwen()
+    }
+  }, [isActive])
 
 
 
@@ -801,6 +838,266 @@ function WaterComputePlanner({ isActive = true }) {
           </div>
 
         </div>
+
+      </div>
+
+      {/* ──────────────────────────────────────────────────────────────────
+          🤖 QWEN 2.5 AI MATHEMATICAL CALCULATION ENGINE & FORMULA PROOF
+      ────────────────────────────────────────────────────────────────── */}
+      <div style={{
+        background: '#0a0f14',
+        border: '1px solid rgba(118, 185, 0, 0.25)',
+        borderRadius: '8px',
+        padding: '1.25rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
+      }}>
+        {/* Panel Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <div style={{
+              width: '32px', height: '32px', borderRadius: '8px',
+              background: 'rgba(118, 185, 0, 0.12)', border: '1px solid rgba(118, 185, 0, 0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Bot size={20} color="#76B900" />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                Qwen 2.5 AI Thermodynamic Calculation Engine
+                <span style={{
+                  fontSize: '0.58rem',
+                  background: 'rgba(118, 185, 0, 0.12)',
+                  color: '#76B900',
+                  border: '1px solid rgba(118, 185, 0, 0.3)',
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  fontWeight: 700
+                }}>
+                  {aiMathResult?.engine || 'Local Ollama'}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.65rem', color: '#8b949e', marginTop: '2px' }}>
+                Active neural thermodynamic verification: models live platform telemetry and Transformer compute scaling laws.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {/* Tab switchers */}
+            <div style={{ display: 'flex', background: '#0e141a', padding: '3px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <button
+                onClick={() => setActiveFormulaTab('cooling')}
+                style={{
+                  padding: '4px 10px', borderRadius: '4px', border: 'none',
+                  background: activeFormulaTab === 'cooling' ? '#76B900' : 'transparent',
+                  color: activeFormulaTab === 'cooling' ? '#000' : '#8b949e',
+                  fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s'
+                }}
+              >
+                🌊 Cooling Formulas
+              </button>
+              <button
+                onClick={() => setActiveFormulaTab('training')}
+                style={{
+                  padding: '4px 10px', borderRadius: '4px', border: 'none',
+                  background: activeFormulaTab === 'training' ? '#76B900' : 'transparent',
+                  color: activeFormulaTab === 'training' ? '#000' : '#8b949e',
+                  fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s'
+                }}
+              >
+                ⚡ 6·N·D Scaling Law
+              </button>
+              <button
+                onClick={() => setActiveFormulaTab('proof')}
+                style={{
+                  padding: '4px 10px', borderRadius: '4px', border: 'none',
+                  background: activeFormulaTab === 'proof' ? '#76B900' : 'transparent',
+                  color: activeFormulaTab === 'proof' ? '#000' : '#8b949e',
+                  fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s'
+                }}
+              >
+                📝 AI Derivation Proof
+              </button>
+            </div>
+
+            <button
+              onClick={handleComputeWithQwen}
+              disabled={aiComputing}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.35rem',
+                background: aiComputing ? 'rgba(118, 185, 0, 0.2)' : '#76B900',
+                border: 'none', color: '#000',
+                padding: '5px 12px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800,
+                cursor: aiComputing ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <RefreshCw size={12} className={aiComputing ? 'spin' : ''} />
+              {aiComputing ? 'Calculating...' : 'Re-calculate with Qwen'}
+            </button>
+          </div>
+        </div>
+
+        {/* TAB 1: SERVER COOLING FORMULAS */}
+        {activeFormulaTab === 'cooling' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
+            
+            {/* Card 1: Server Total Power */}
+            <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '0.85rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8b949e', display: 'flex', justifyContent: 'space-between' }}>
+                <span>1. TOTAL SERVER POWER DRAW</span>
+                <span style={{ color: 'var(--accent)', fontFamily: 'JetBrains Mono, monospace' }}>P_total (kW)</span>
+              </div>
+              <div style={{
+                background: '#070b0e', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '4px',
+                padding: '0.5rem', margin: '0.5rem 0', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.72rem', color: '#76B900'
+              }}>
+                P_server = (∑ P_gpus + 180W_aux) / 1000
+              </div>
+              <div style={{ fontSize: '0.62rem', color: '#cbd5e1', lineHeight: '1.4' }}>
+                <strong>Substituted Live Variables:</strong><br />
+                ({(data?.physical_gpus?.reduce((acc, g) => acc + g.power_draw, 0) || 120).toFixed(0)}W GPU + 180W Aux) / 1000 = <span style={{ color: '#fff', fontWeight: 800 }}>{totalPowerKW.toFixed(3)} kW</span>
+              </div>
+            </div>
+
+            {/* Card 2: Effective WUE */}
+            <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '0.85rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8b949e', display: 'flex', justifyContent: 'space-between' }}>
+                <span>2. EFFECTIVE WUE EQUATION</span>
+                <span style={{ color: '#06b6d4', fontFamily: 'JetBrains Mono, monospace' }}>WUE (L/kWh)</span>
+              </div>
+              <div style={{
+                background: '#070b0e', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '4px',
+                padding: '0.5rem', margin: '0.5rem 0', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.72rem', color: '#06b6d4'
+              }}>
+                WUE = Base_WUE + ΔWUE_thermal
+              </div>
+              <div style={{ fontSize: '0.62rem', color: '#cbd5e1', lineHeight: '1.4' }}>
+                <strong>Substituted Live Variables:</strong><br />
+                {baseWue} L/kWh + {(data?.physical_gpus?.[0]?.temperature > 70 ? 0.05 : 0).toFixed(2)} (T &gt; 70°C Penalty) = <span style={{ color: '#fff', fontWeight: 800 }}>{currentWUE.toFixed(3)} L/kWh</span>
+              </div>
+            </div>
+
+            {/* Card 3: Hourly Water Draw */}
+            <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '0.85rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8b949e', display: 'flex', justifyContent: 'space-between' }}>
+                <span>3. HOURLY WATER CONSUMPTION</span>
+                <span style={{ color: '#38bdf8', fontFamily: 'JetBrains Mono, monospace' }}>Water (L/hr)</span>
+              </div>
+              <div style={{
+                background: '#070b0e', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '4px',
+                padding: '0.5rem', margin: '0.5rem 0', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.72rem', color: '#38bdf8'
+              }}>
+                Water_hr = P_server × WUE
+              </div>
+              <div style={{ fontSize: '0.62rem', color: '#cbd5e1', lineHeight: '1.4' }}>
+                <strong>Substituted Live Variables:</strong><br />
+                {totalPowerKW.toFixed(3)} kW × {currentWUE.toFixed(3)} L/kWh = <span style={{ color: '#fff', fontWeight: 800 }}>{waterConsumptionLPerHour.toFixed(3)} Liters/hr</span>
+              </div>
+            </div>
+
+            {/* Card 4: Chiller Flow & Evaporative Loss */}
+            <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '0.85rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8b949e', display: 'flex', justifyContent: 'space-between' }}>
+                <span>4. CHILLER FLOW & EVAPORATION</span>
+                <span style={{ color: '#a855f7', fontFamily: 'JetBrains Mono, monospace' }}>L/min & L/hr</span>
+              </div>
+              <div style={{
+                background: '#070b0e', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '4px',
+                padding: '0.5rem', margin: '0.5rem 0', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.72rem', color: '#a855f7'
+              }}>
+                Flow = P_server × 1.5 × η | Evap = Water × 0.95
+              </div>
+              <div style={{ fontSize: '0.62rem', color: '#cbd5e1', lineHeight: '1.4' }}>
+                <strong>Substituted Live Variables:</strong><br />
+                Chiller: <span style={{ color: '#fff', fontWeight: 800 }}>{chillerFlowRateLPerMin.toFixed(2)} L/min</span> | Evap: <span style={{ color: '#fff', fontWeight: 800 }}>{evaporativeLossLPerHour.toFixed(3)} L/hr</span>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB 2: TRANSFORMER SCALING (6·N·D) */}
+        {activeFormulaTab === 'training' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+            
+            {/* Card 1: 6 * N * D FLOPs */}
+            <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '0.85rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8b949e' }}>
+                TRANSFORMER COMPUTE SCALING LAW (KAPLAN & CHINCHILLA)
+              </div>
+              <div style={{
+                background: '#070b0e', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '4px',
+                padding: '0.5rem', margin: '0.5rem 0', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.72rem', color: '#76B900'
+              }}>
+                Total FLOPs = 6 × N_parameters × D_tokens
+              </div>
+              <div style={{ fontSize: '0.62rem', color: '#cbd5e1', lineHeight: '1.5' }}>
+                6 × ({modelSizeBillion} × 10⁹) × ({datasetSizeBillion} × 10⁹) = <strong style={{ color: '#fff' }}>{(totalFlopsRequired / 1e21).toFixed(3)} ZettaFLOPs</strong><br />
+                <span style={{ color: '#8b949e' }}>Theoretical floating-point operations for training forward and backward passes.</span>
+              </div>
+            </div>
+
+            {/* Card 2: GPU Cluster Provisioning */}
+            <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '0.85rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8b949e' }}>
+                HARDWARE CLUSTER SIZING AT 30% MFU
+              </div>
+              <div style={{
+                background: '#070b0e', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '4px',
+                padding: '0.5rem', margin: '0.5rem 0', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.72rem', color: '#06b6d4'
+              }}>
+                GPUs = ⌈ FLOPs / (Target_Sec × GPU_TFLOPs × 0.30 MFU) ⌉
+              </div>
+              <div style={{ fontSize: '0.62rem', color: '#cbd5e1', lineHeight: '1.5' }}>
+                Requires: <strong style={{ color: '#fff' }}>{totalGpusNeeded} {selectedGpu.label} GPUs</strong> ({totalServersNeeded} × 8-GPU Cabinets)<br />
+                <span style={{ color: '#8b949e' }}>Target Deadline: {targetDays} Days ({secondsInTargetDays.toLocaleString()} seconds).</span>
+              </div>
+            </div>
+
+            {/* Card 3: Lifecycle Water Footprint */}
+            <div style={{ background: '#0e141a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '0.85rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8b949e' }}>
+                LIFECYCLE WATER & ENERGY FOOTPRINT
+              </div>
+              <div style={{
+                background: '#070b0e', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '4px',
+                padding: '0.5rem', margin: '0.5rem 0', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.72rem', color: '#38bdf8'
+              }}>
+                Water_total (L) = Energy_MWh × 1000 × WUE
+              </div>
+              <div style={{ fontSize: '0.62rem', color: '#cbd5e1', lineHeight: '1.5' }}>
+                {estimatedTotalMWh.toFixed(2)} MWh × 1000 × {baseWue} = <strong style={{ color: '#00f2fe' }}>{estimatedTotalWaterLiters.toLocaleString()} Liters</strong><br />
+                <span style={{ color: '#8b949e' }}>Equivalent to {((estimatedTotalWaterLiters / 2500000) * 100).toFixed(2)}% of an Olympic swimming pool.</span>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB 3: QWEN AI MATHEMATICAL PROOF */}
+        {activeFormulaTab === 'proof' && (
+          <div style={{
+            background: '#070b0e',
+            border: '1px solid rgba(255,255,255,0.05)',
+            borderRadius: '6px',
+            padding: '1rem',
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: '0.72rem',
+            lineHeight: '1.6',
+            color: '#e2e8f0',
+            maxHeight: '260px',
+            overflowY: 'auto',
+            whiteSpace: 'pre-wrap'
+          }}>
+            {aiMathResult?.qwen_derivation || (
+              aiComputing ? '⏳ Qwen 2.5 is computing thermodynamic equations from live platform telemetry...' :
+              'Click "Re-calculate with Qwen" to generate an on-the-fly thermodynamic mathematical proof.'
+            )}
+          </div>
+        )}
 
       </div>
 

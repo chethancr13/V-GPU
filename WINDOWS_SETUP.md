@@ -30,6 +30,9 @@ If you have cloned this repository and opened it in your IDE on Windows, follow 
 | Action / Goal | Command to Type in IDE Terminal | Description |
 | :--- | :--- | :--- |
 | **First-Time Setup** | `powershell -ExecutionPolicy Bypass -File scripts\setup-windows.ps1` | Installs all Windows build tools automatically |
+| **Install Ollama (Native)** | `winget install Ollama.Ollama` | Installs Ollama locally with full Windows NVIDIA/AMD GPU acceleration |
+| **Download Qwen Model** | `ollama pull qwen2.5:3b` | Downloads fast Qwen 2.5 model (1.9 GB) |
+| **Chat with Qwen** | `ollama run qwen2.5:3b` | Interactive terminal AI chat session |
 | **Run Desktop App (Dev Mode)** | `npm run tauri dev` | Starts Python backend, React frontend & launches live Desktop App |
 | **Run via Python Launcher** | `python vgpu_launcher.py tauri` | Alternative launcher command |
 | **Build `.exe` / `.msi` Installer** | `scripts\build-windows.bat` | Compiles standalone Windows installers into `frontend\src-tauri\target\release\bundle\` |
@@ -113,3 +116,77 @@ When you push code or publish a new release tag (e.g., `v1.0.0`), the GitHub Act
 2. Compile the Rust backend and React frontend.
 3. Generate standalone `.msi` and `.exe` installers.
 4. Attach them to GitHub Releases.
+
+---
+
+## 🦙 Ollama & Qwen 2.5 Local AI Setup for Windows
+
+V-GPU uses a **100% private, local AI engine** powered by **Qwen 2.5** via **Ollama**. It requires **zero cloud API keys** and runs completely offline.
+
+### 1. Install Ollama on Windows
+
+Choose either **Native Windows** (recommended for NVIDIA/AMD GPU acceleration) or **Docker Desktop**:
+
+#### Option A: Native Windows (Recommended — GPU Accelerated)
+Native Windows Ollama utilizes your dedicated GPU (NVIDIA CUDA or AMD ROCm) for near-instant (40+ tokens/sec) responses.
+
+In PowerShell or Command Prompt:
+```powershell
+# Using Windows Package Manager (winget)
+winget install Ollama.Ollama
+```
+*Or download directly from [ollama.com/download/windows](https://ollama.com/download/windows) and run the installer.*
+
+Once installed, Ollama runs automatically in the Windows background taskbar and listens on port `http://localhost:11434`.
+
+#### Option B: Docker Desktop on Windows
+If you already use Docker Desktop on Windows:
+```cmd
+docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
+```
+
+---
+
+### 2. Pull Qwen 2.5 Models
+
+Open PowerShell or Command Prompt and download your preferred model:
+
+**Fast 3B Model (Recommended — Ultra-responsive & fits in 2 GB RAM):**
+```cmd
+ollama pull qwen2.5:3b
+```
+*(If using Docker on Windows: `docker exec -it ollama ollama pull qwen2.5:3b`)*
+
+**Full 7.6B Model (Maximum parameter reasoning):**
+```cmd
+ollama pull qwen2.5:latest
+```
+*(If using Docker on Windows: `docker exec -it ollama ollama pull qwen2.5:latest`)*
+
+---
+
+### 3. Verify Qwen in Windows Terminal
+
+Test interactive conversation directly in PowerShell/CMD:
+```cmd
+# Native Windows:
+ollama run qwen2.5:3b
+
+# Docker on Windows:
+docker exec -it ollama ollama run qwen2.5:3b
+```
+Type `/bye` to exit.
+
+---
+
+### 4. Integration with V-GPU
+
+No configuration is needed! When you start V-GPU (`npm run tauri dev` or `python vgpu_launcher.py`):
+1. The backend automatically pings `http://localhost:11434/api/tags`.
+2. It auto-discovers `qwen2.5:3b` and `qwen2.5:latest`.
+3. It immediately routes:
+   - **Copilot Chat Drawer** (bottom-right)
+   - **Project AI Assistant Tab** (code & docs RAG)
+   - **Thermodynamic Water & Power Engine** (live calculation of $P_{\text{server}}$, WUE, and $6 \cdot N \cdot D$ FLOPs)
+4. A green indicator badge (`🟢 Local Qwen 2.5 (Active)`) confirms connection.
+

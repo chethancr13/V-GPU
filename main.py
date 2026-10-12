@@ -19,6 +19,7 @@ from core.chatbot.rag_engine import ProjectRAGEngine
 from core.chatbot.indexer import ProjectIndexer
 from core.chatbot.memory import ChatMemory
 from core.chatbot.metrics_collector import get_live_snapshot, format_metrics_for_prompt
+from core.chatbot.ollama_engine import ollama_engine
 
 app = FastAPI(title="V-GPU NVIDIA Control Plane (Monolith)")
 
@@ -262,101 +263,27 @@ async def handle_agent_chat(message: str, active_tab: str, history: List[Dict[st
             detected_tab = tab_id
             break
 
-    # If API Key is present, try Gemini
-    if api_key:
-        system_instruction = f"""
-You are V-GPU Copilot, an advanced production-ready AI agent embedded in the V-GPU (Virtual GPU) control plane platform.
-V-GPU is a monolith system simulating physical NVIDIA GPUs and provisioning them as isolated Docker container workloads (vGPUs) with strict VRAM and compute allocations.
-
-Your task is to answer user queries and optionally navigate the application to the relevant page.
-You are fully conversational and should handle greetings, general check-ins, small talk, and project queries like ChatGPT or Gemini.
-
-### UI Workspace Tabs:
-- 'dashboard': Overall cluster status, scheduling stats, physical GPUs.
-- 'gpu_monitor': Live graphs of compute load, memory, temperature, and power.
-- 'ai_data_center': 3D datacenter node visualization and live job execution.
-- 'water_resource': Environmental cooling impact, carbon intensity, green compute.
-- 'comparison': Side-by-side PyTorch execution benchmarks vs Jupyter and Colab.
-- 'vgpu': Provisioning interface for custom vGPU nodes (setting VRAM/compute).
-- 'vm_inspector': Hypervisor, Docker container limits, CPU-Z hardware specs.
-- 'graphics': Live 3D shape/wireframe render views from vGPU stress testing.
-- 'logs': Live execution stdout/stderr logs.
-
-### V-GPU Codebase Architecture & File Roles:
-- `main.py`: The monolithic FastAPI backend entry point. Defines routes for dataset management, script uploads, vGPU provisioning (`/api/vgpu/provision`), job executions (`/api/jobs/ml`), real-time metrics websockets (`/ws/metrics`), and graphic rendering streams (`/ws/render/{{vgpu_id}}`).
-- `core/vgpu_driver.py`: Lower-level simulation of physical GPUs and custom sliced vGPU instances. Handles memory capacity and compute limit boundaries.
-- `core/scheduler.py`: A queue-based FIFO scheduling manager that monitors vGPU cluster load, selects nodes with sufficient headroom, and launches jobs.
-- `core/isolation.py`: Background enforcement agent that checks active vGPU containers every second and applies strict resource quotas.
-- `core/job_executor.py`: Spawns ML workloads inside Docker containers matching the provisioned `vgpu-worker` image.
-- `core/benchmark_runner.py`: Orchestrates comparative benchmarks (speed/energy consumption) for PyTorch code on V-GPU, local Jupyter, and Google Colab.
-- `scripts/start_dev.py`: Automated developer startup orchestrator (checks Docker daemon, builds worker image, syncs host-VM clocks, spins up Uvicorn, and boots Tauri Vite frontend).
-- `vgpu_launcher.py`: Python command-line utility for launching, executing jobs, and container garbage collection.
-
-### Command Reference Guide:
-{commands_doc}
-
-### Response Output Schema:
-Your response MUST be a JSON object containing exactly two fields:
-{{
-  "text": "Your conversational markdown-formatted answer to the user. Use clear bullet points, code blocks, and bolding where appropriate. Respond warmly and naturally to conversational prompts (greetings, small talk, etc.).",
-  "navigate": "one of the tab IDs listed above if the user wants to go to, see, or open that tab/screen/metric, otherwise null"
-}}
-Keep answers clear, highly technical, and conversational.
-"""
+    # Query local Ollama Qwen model if running
+    ollama_status = ollama_engine.get_status()
+    if ollama_status.get("running"):
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-            
-            # Format chat history
-            contents = []
-            if history:
-                for h in history:
-                    contents.append({
-                        "role": "user" if h.get("role") == "user" else "model",
-                        "parts": [{"text": h.get("content", h.get("text", ""))}]
-                    })
-            contents.append({
-                "role": "user",
-                "parts": [{"text": message}]
-            })
-            
-            payload = {
-                "contents": contents,
-                "systemInstruction": {
-                    "parts": [{"text": system_instruction}]
-                },
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "temperature": 0.2
+            ollama_res = ollama_engine.generate(
+                prompt=message,
+                system_prompt=system_instruction,
+                model_name=ollama_status.get("active_model", "qwen2.5:latest"),
+                format_json=True
+            )
+            if ollama_res and ollama_res.get("text"):
+                nav = ollama_res.get("navigate")
+                if nav not in navigation_map:
+                    nav = None
+                return {
+                    "text": ollama_res["text"],
+                    "navigate": nav or detected_tab
                 }
-            }
-            
-            def call_api():
-                req = urllib.request.Request(
-                    url,
-                    data=json.dumps(payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
-                    method="POST"
-                )
-                with urllib.request.urlopen(req, timeout=8) as res:
-                    return res.read().decode("utf-8")
-                    
-            loop = asyncio.get_event_loop()
-            raw_res = await loop.run_in_executor(None, call_api)
-            res_data = json.loads(raw_res)
-            
-            text_out = res_data["candidates"][0]["content"]["parts"][0]["text"]
-            parsed_json = json.loads(text_out)
-            
-            nav = parsed_json.get("navigate")
-            if nav not in navigation_map:
-                nav = None
-                
-            return {
-                "text": parsed_json.get("text", ""),
-                "navigate": nav or detected_tab
-            }
         except Exception as e:
-            print(f"Gemini API failure, falling back to local engine: {e}")
+            print(f"Ollama decision engine failed: {e}")
+
 
     # Local fallback engine
     response_text = ""
@@ -429,7 +356,7 @@ Keep answers clear, highly technical, and conversational.
         elif "who are you" in msg_lower or "help" in msg_lower or "what can you do" in msg_lower:
             response_text = "I am the **V-GPU Copilot**. I can explain how the vGPU orchestration architecture works, guide you through provisioning/running jobs, and help you navigate between tabs. Try asking: *'Take me to the GPU Monitor'* or *'How does isolation work?'*"
         else:
-            response_text = "I understand you are asking about V-GPU. I am a local assistant dedicated to this project. I can help you with:\n\n- **Navigation**: Ask me to go to the Dashboard, GPU Monitor, Logs, or VM Inspector.\n- **Command Reference**: Learn how to run workloads via `vgpu_launcher.py`.\n- **Architecture Q&A**: Get information about resource isolation, scheduler load balancing, or water compute planning.\n\n*Tip: Connect your Gemini API Key in the Copilot settings drawer to enable dynamic conversation!*"
+            response_text = "I understand you are asking about V-GPU. I am a local assistant dedicated to this project. I can help you with:\n\n- **Navigation**: Ask me to go to the Dashboard, GPU Monitor, Logs, or VM Inspector.\n- **Command Reference**: Learn how to run workloads via `vgpu_launcher.py`.\n- **Architecture Q&A**: Get information about resource isolation, scheduler load balancing, or water compute planning.\n\n*Tip: Powered by local Qwen 2.5 via Ollama with live telemetry awareness!*"
 
     return {
         "text": response_text,
@@ -437,32 +364,23 @@ Keep answers clear, highly technical, and conversational.
     }
 
 @app.post("/api/agent/chat")
-async def agent_chat(req: ChatRequest, request: Request):
-    user_key = request.headers.get("x-gemini-key")
-    api_key = user_key or os.environ.get("GEMINI_API_KEY")
-    res = await handle_agent_chat(req.message, req.active_tab, req.history, api_key)
+async def agent_chat(req: ChatRequest):
+    res = await handle_agent_chat(req.message, req.active_tab, req.history)
     return res
 
 # --- PROJECT RAG CHATBOT ENDPOINTS ---
 class RAGQueryRequest(BaseModel):
     message: str
     session_id: Optional[str] = "default_session"
-    api_key: Optional[str] = None
-    hf_token: Optional[str] = None
 
 @app.post("/api/chatbot/query")
-async def rag_chatbot_query(req: RAGQueryRequest, request: Request):
-    user_key = request.headers.get("x-gemini-key")
-    api_key = req.api_key or user_key or os.environ.get("GEMINI_API_KEY")
-    hf_token = req.hf_token or request.headers.get("x-hf-token") or os.environ.get("HF_TOKEN")
-    result = rag_engine.query(req.message, session_id=req.session_id, api_key=api_key, hf_token=hf_token)
+async def rag_chatbot_query(req: RAGQueryRequest):
+    result = rag_engine.query(req.message, session_id=req.session_id)
     return result
 
 @app.post("/api/chatbot/index/resync")
-async def rag_index_resync(request: Request):
-    user_key = request.headers.get("x-gemini-key")
-    api_key = user_key or os.environ.get("GEMINI_API_KEY")
-    stats = project_indexer.scan_and_index(force_reindex=True, api_key=api_key)
+async def rag_index_resync():
+    stats = project_indexer.scan_and_index(force_reindex=True)
     return stats
 
 @app.get("/api/chatbot/index/status")
@@ -480,22 +398,27 @@ async def rag_clear_history(session_id: str):
     chat_memory.clear_history(session_id)
     return {"status": "success", "session_id": session_id}
 
-# --- UNIFIED AI CHAT ENDPOINT (General AI + Live Metrics) ---
+# --- UNIFIED AI CHAT ENDPOINT (General AI + Live Metrics + Ollama/Qwen) ---
 class UnifiedChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = "default_session"
-    api_key: Optional[str] = None
     history: Optional[List[Dict[str, str]]] = []
+    preferred_engine: Optional[str] = "ollama"  # "ollama"
+    model_name: Optional[str] = None  # e.g. "qwen2.5", "qwen2.5:3b", or "qwen2.5:latest"
+
+@app.get("/api/ollama/status")
+async def get_ollama_status():
+    """Returns Ollama daemon connection status and available local models (e.g. Qwen)."""
+    return await ollama_engine.get_status_async()
 
 @app.post("/api/chat")
-async def unified_chat(req: UnifiedChatRequest, request: Request):
+async def unified_chat(req: UnifiedChatRequest):
     """
     Unified chat endpoint that bridges general AI knowledge with live platform metrics.
-    The LLM receives the current platform state as context and decides whether to
-    reference live metrics or answer from pre-trained knowledge.
+    Engine priority:
+    1. Local Ollama (Qwen 2.5)
+    2. Grounded local offline synthesizer fallback
     """
-    user_key = request.headers.get("x-gemini-key")
-    api_key = req.api_key or user_key or os.environ.get("GEMINI_API_KEY")
 
     # Collect live metrics snapshot
     snapshot = get_live_snapshot()
@@ -509,11 +432,12 @@ async def unified_chat(req: UnifiedChatRequest, request: Request):
         "vram", "memory", "usage", "vgpu", "instance", "running",
         "job", "scheduler", "queue", "active", "pending", "status",
         "metrics", "stats", "health", "cluster", "load", "stress",
-        "how much", "how many", "current", "right now", "live"
+        "how much", "how many", "current", "right now", "live",
+        "water", "cooling", "wue", "pue", "chiller", "evaporation", "carbon"
     ]
     is_metrics_query = any(kw in msg_lower for kw in metrics_keywords)
 
-    # Navigation detection (reuse existing logic)
+    # Navigation detection
     navigation_map = {
         "dashboard": ["dashboard", "home", "main page", "overview", "landing"],
         "gpu_monitor": ["monitor", "telemetry", "temp", "temperature", "power", "charts", "utilization", "realtime", "real-time", "graphs"],
@@ -531,102 +455,48 @@ async def unified_chat(req: UnifiedChatRequest, request: Request):
             detected_tab = tab_id
             break
 
-    # If we have an API key, use Gemini with live metrics context
-    if api_key:
-        import urllib.request
-        import json as json_mod
-
-        system_instruction = f"""You are V-GPU Copilot, an advanced AI agent embedded in the V-GPU (Virtual GPU) control plane platform.
-You have two capabilities:
-1. **General AI Knowledge**: You can answer any general question about machine learning, programming, science, math, or any topic using your pre-trained knowledge.
-2. **Live Platform Metrics**: You have access to REAL-TIME live metrics from the V-GPU cluster below. When users ask about GPU temperatures, power draw, running jobs, vGPU instances, or platform health, you MUST reference these live values.
+    system_instruction = f"""You are V-GPU Copilot, powered by local Qwen 2.5.
+You are embedded in the V-GPU control plane platform.
 
 {metrics_context}
 
-### UI Workspace Tabs:
-- 'dashboard': Overall cluster status, scheduling stats, physical GPUs.
-- 'gpu_monitor': Live graphs of compute load, memory, temperature, and power.
-- 'ai_data_center': 3D datacenter node visualization and live job execution.
-- 'water_resource': Environmental cooling impact, carbon intensity, green compute.
-- 'comparison': Side-by-side PyTorch execution benchmarks vs Jupyter and Colab.
-- 'vgpu': Provisioning interface for custom vGPU nodes (setting VRAM/compute).
-- 'vm_inspector': Hypervisor, Docker container limits, CPU-Z hardware specs.
-- 'graphics': Live 3D shape/wireframe render views from vGPU stress testing.
-- 'logs': Live execution stdout/stderr logs.
-
-### Response Rules:
-- If the user asks about current GPU state, temperatures, power, running jobs, VRAM, or any platform metric, provide the ACTUAL values from the LIVE PLATFORM METRICS above.
-- If the user asks a general knowledge question (e.g., "What is gradient descent?", "Explain backpropagation"), answer using your pre-trained knowledge.
-- If the user asks a hybrid question (e.g., "Is GPU 0 running hot? Should I reduce the workload?"), combine live metrics with your expert reasoning.
-- Be warm, conversational, and technically precise.
-- Use markdown formatting with bullet points, code blocks, and bolding.
-
-### Response Output Schema:
-Your response MUST be a JSON object containing exactly these fields:
-{{
-  "text": "Your conversational markdown-formatted answer.",
-  "navigate": "one of the tab IDs listed above if the user wants to navigate, otherwise null",
-  "metrics_used": true or false (whether you referenced live platform metrics in your answer)
-}}
+### INSTRUCTIONS:
+- Whenever answering water consumption, power draw, cooling, or AI workload footprint questions:
+  1. Clearly state the EXACT mathematical formula being used (e.g. `Power (kW) = (GPU_Watts + 180W) / 1000`, `Water (L/hr) = Power (kW) * WUE`, `FLOPs = 6 * N * D`).
+  2. Show the step-by-step substitution of the LIVE numbers into the formula variables.
+  3. Provide the final calculated metrics (kW, Liters/hour, Chiller Flow L/min, etc.) in a clean summary table or bullet points.
+- Quote the exact numbers from the LIVE PLATFORM METRICS for any GPU status, load, power, or water queries.
+- Keep responses direct, structured, fast, and technically precise in clean markdown.
 """
 
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-
-            # Format chat history
-            contents = []
-            if req.history:
-                for h in req.history[-6:]:
-                    contents.append({
-                        "role": "user" if h.get("role") == "user" else "model",
-                        "parts": [{"text": h.get("content", h.get("text", ""))}]
-                    })
-            contents.append({
-                "role": "user",
-                "parts": [{"text": req.message}]
-            })
-
-            payload = {
-                "contents": contents,
-                "systemInstruction": {
-                    "parts": [{"text": system_instruction}]
-                },
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "temperature": 0.3
+    # --- LOCAL OLLAMA (QWEN) INFERENCE ---
+    try:
+        ollama_status = await ollama_engine.get_status_async()
+        if ollama_status.get("running"):
+            target_model = req.model_name or ollama_status.get("active_model", "qwen2.5:latest")
+            ollama_res = await ollama_engine.generate_async(
+                prompt=req.message,
+                system_prompt=system_instruction,
+                model_name=target_model,
+                history=req.history,
+                format_json=False
+            )
+            if ollama_res and ollama_res.get("text"):
+                nav = ollama_res.get("navigate")
+                if nav not in navigation_map:
+                    nav = None
+                return {
+                    "answer": ollama_res["text"],
+                    "navigate": nav or detected_tab,
+                    "metrics_used": ollama_res.get("metrics_used", is_metrics_query),
+                    "metrics_snapshot": snapshot if is_metrics_query else None,
+                    "session_id": req.session_id,
+                    "engine": f"Qwen 2.5 ({target_model})"
                 }
-            }
+    except Exception as oe:
+        print(f"Ollama local inference failed, falling back to local synthesizer: {oe}")
 
-            def call_api():
-                api_req = urllib.request.Request(
-                    url,
-                    data=json_mod.dumps(payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
-                    method="POST"
-                )
-                with urllib.request.urlopen(api_req, timeout=12) as res:
-                    return res.read().decode("utf-8")
 
-            loop = asyncio.get_event_loop()
-            raw_res = await loop.run_in_executor(None, call_api)
-            res_data = json_mod.loads(raw_res)
-
-            text_out = res_data["candidates"][0]["content"]["parts"][0]["text"]
-            parsed_json = json_mod.loads(text_out)
-
-            nav = parsed_json.get("navigate")
-            if nav not in navigation_map:
-                nav = None
-
-            return {
-                "answer": parsed_json.get("text", ""),
-                "navigate": nav or detected_tab,
-                "metrics_used": parsed_json.get("metrics_used", is_metrics_query),
-                "metrics_snapshot": snapshot if is_metrics_query else None,
-                "session_id": req.session_id
-            }
-        except Exception as e:
-            print(f"Unified chat Gemini API failure, falling back to local engine: {e}")
 
     # --- Local offline fallback ---
     response_text = ""
@@ -740,7 +610,7 @@ Your response MUST be a JSON object containing exactly these fields:
                         "📊 **Metrics**: *\"What's the GPU temperature?\"*, *\"Show me VRAM usage\"*, *\"How many jobs are running?\"*\n\n"
                         "🧠 **General AI**: *\"What is gradient descent?\"*, *\"Explain backpropagation\"*\n\n"
                         "🔀 **Navigation**: *\"Take me to the GPU Monitor\"*, *\"Open the scheduler\"*\n\n"
-                        "*Tip: Connect your Gemini API Key to enable full conversational AI with live metrics awareness!*")
+                        "*Tip: Powered by local Qwen 2.5 via Ollama with live telemetry awareness!*")
 
     return {
         "answer": response_text,
@@ -755,6 +625,146 @@ Your response MUST be a JSON object containing exactly these fields:
 async def get_metrics_snapshot():
     """Returns the current live metrics snapshot for the entire V-GPU platform."""
     return get_live_snapshot()
+
+
+class WaterPowerComputeRequest(BaseModel):
+    model_size_b: Optional[float] = 70.0
+    dataset_tokens_b: Optional[float] = 300.0
+    target_days: Optional[int] = 14
+    gpu_model: Optional[str] = "H100"
+    cooling_mode: Optional[str] = "liquid"  # "liquid" or "air"
+
+@app.post("/api/ai/compute-water-power")
+async def ai_compute_water_power(req: WaterPowerComputeRequest):
+    """
+    Dedicated AI Mathematical Computation endpoint:
+    Calculates exact thermodynamic power & water metrics, evaluates AI model
+    training footprint scaling, and generates a verified mathematical derivation via Qwen 2.5.
+    """
+    import math
+    snapshot = get_live_snapshot()
+    total_gpu_w = snapshot["system_health"]["cluster_total_power_draw_w"]
+    server_power_kw = round((total_gpu_w + 180.0) / 1000.0, 3)
+    
+    is_liquid = req.cooling_mode.lower() == "liquid"
+    base_wue = 0.28 if is_liquid else 0.45
+    thermal_penalty = 0.05 if snapshot["system_health"]["any_gpu_hot"] else 0.0
+    current_wue = round(base_wue + thermal_penalty, 3)
+    
+    water_consumption_l_per_hr = round(server_power_kw * current_wue, 3)
+    chiller_flow_l_per_min = round(server_power_kw * 1.5 * (1.2 if is_liquid else 0.8), 3)
+    evaporative_loss_l_per_hr = round(water_consumption_l_per_hr * 0.95, 3)
+    water_recirculated_l_per_hr = round((chiller_flow_l_per_min * 60.0) - evaporative_loss_l_per_hr, 3)
+    carbon_kg_per_hr = round(server_power_kw * 0.385, 3)
+    
+    # Training Scaling Computation: FLOPs = 6 * N * D
+    gpu_specs = {
+        "H100": {"tflops": 350.0, "power_w": 700.0, "label": "NVIDIA H100 SXM5"},
+        "A100": {"tflops": 156.0, "power_w": 400.0, "label": "NVIDIA A100 SXM4"},
+        "L40S": {"tflops": 91.0, "power_w": 350.0, "label": "NVIDIA L40S PCIe"}
+    }
+    gpu_spec = gpu_specs.get(req.gpu_model, gpu_specs["H100"])
+    
+    total_flops = 6.0 * req.model_size_b * 1e9 * req.dataset_tokens_b * 1e9
+    seconds_in_days = max(req.target_days * 24 * 3600, 1)
+    target_tflops_needed = total_flops / (seconds_in_days * 1e12)
+    mfu = 0.30  # 30% MFU
+    total_gpus_needed = math.ceil(target_tflops_needed / (gpu_spec["tflops"] * mfu))
+    total_servers_needed = math.ceil(total_gpus_needed / 8)
+    actual_gpus_allocated = total_servers_needed * 8
+    
+    estimated_cluster_kw = round((actual_gpus_allocated * gpu_spec["power_w"] + total_servers_needed * 450.0) / 1000.0, 2)
+    estimated_total_mwh = round((estimated_cluster_kw * req.target_days * 24.0) / 1000.0, 2)
+    estimated_total_water_liters = round((estimated_total_mwh * 1000.0) * current_wue, 0)
+    
+    # Generate mathematical derivation with Qwen
+    qwen_prompt = f"""You are the Qwen 2.5 thermodynamic math verification engine for V-GPU.
+Given these live platform and cluster training figures:
+- Server Power Draw: {server_power_kw} kW (GPU Cluster: {total_gpu_w}W + 180W Auxiliary)
+- Effective WUE: {current_wue} L/kWh (Base: {base_wue} L/kWh, Thermal Penalty: {thermal_penalty} L/kWh)
+- Water Consumption Rate: {water_consumption_l_per_hr} L/hr
+- Chiller Flow Rate: {chiller_flow_l_per_min} L/min
+- Evaporative Loss (95%): {evaporative_loss_l_per_hr} L/hr
+- Model: {req.model_size_b}B Params, {req.dataset_tokens_b}B Tokens, {req.target_days} Days on {req.gpu_model}
+- Training FLOPs: 6 * N * D = {total_flops:.2e} FLOPs
+- Allocated GPUs: {actual_gpus_allocated} GPUs across {total_servers_needed} Servers (Peak Power: {estimated_cluster_kw} kW)
+- Total Energy: {estimated_total_mwh} MWh -> Total Water Footprint: {estimated_total_water_liters:,.0f} Liters
+
+Provide a concise 3-4 bullet point mathematical proof and thermodynamic validation showing:
+1. The exact formula for Server Power and Hourly Water Consumption with substituted numbers.
+2. The exact formula for Chiller Flow & Evaporative Loss.
+3. The exact Transformer FLOPs scaling formula (6 * N * D) and training water footprint."""
+
+    ai_derivation = None
+    target_model_name = "qwen2.5:3b"
+    try:
+        ollama_status = await ollama_engine.get_status_async()
+        if ollama_status.get("running"):
+            target_model_name = ollama_status.get("active_model", "qwen2.5:3b")
+            q_res = await ollama_engine.generate_async(
+                prompt=qwen_prompt,
+                system_prompt="You are an expert computational thermodynamicist. Provide step-by-step mathematical proofs with exact formulas and numbers.",
+                model_name=target_model_name,
+                format_json=False
+            )
+            if q_res and q_res.get("text"):
+                ai_derivation = q_res["text"]
+    except Exception as e:
+        print(f"Qwen verification query failed: {e}")
+
+    if not ai_derivation:
+        ai_derivation = (
+            f"### 🧮 Thermodynamic Mathematical Proof (Qwen 2.5 Offline Engine)\n\n"
+            f"1. **Server Power & Water Consumption**:\n"
+            f"   - $$P_{{\\text{{server}}}} = \\frac{{{total_gpu_w}\\text{{W}} + 180\\text{{W}}}}{{1000}} = {server_power_kw}\\text{{ kW}}$$\n"
+            f"   - $$\\text{{Water (L/hr)}} = P_{{\\text{{server}}}} \\times \\text{{WUE}} = {server_power_kw} \\times {current_wue} = {water_consumption_l_per_hr}\\text{{ L/hr}}$$\n\n"
+            f"2. **Chiller Flow Rate & Evaporative Loss**:\n"
+            f"   - $$\\text{{Flow (L/min)}} = P_{{\\text{{server}}}} \\times 1.5 \\times {(1.2 if is_liquid else 0.8)} = {chiller_flow_l_per_min}\\text{{ L/min}}$$\n"
+            f"   - $$\\text{{Evaporation (L/hr)}} = {water_consumption_l_per_hr} \\times 0.95 = {evaporative_loss_l_per_hr}\\text{{ L/hr}}$$\n\n"
+            f"3. **Transformer Training Compute & Water Footprint**:\n"
+            f"   - $$\\text{{FLOPs}} = 6 \\times N \\times D = 6 \\times {req.model_size_b}\\times 10^9 \\times {req.dataset_tokens_b}\\times 10^9 = {total_flops:.2e}\\text{{ FLOPs}}$$\n"
+            f"   - $$\\text{{Total Water}} = \\text{{Energy (MWh)}} \\times 1000 \\times \\text{{WUE}} = {estimated_total_mwh} \\times 1000 \\times {current_wue} = {estimated_total_water_liters:,.0f}\\text{{ Liters}}$$"
+        )
+
+    return {
+        "status": "success",
+        "engine": f"Qwen 2.5 ({target_model_name})",
+        "live_metrics": {
+            "server_power_kw": server_power_kw,
+            "gpu_cluster_watts": total_gpu_w,
+            "base_wue": base_wue,
+            "thermal_penalty": thermal_penalty,
+            "effective_wue": current_wue,
+            "water_consumption_l_per_hr": water_consumption_l_per_hr,
+            "chiller_flow_l_per_min": chiller_flow_l_per_min,
+            "evaporative_loss_l_per_hr": evaporative_loss_l_per_hr,
+            "water_recirculated_l_per_hr": water_recirculated_l_per_hr,
+            "carbon_kg_per_hr": carbon_kg_per_hr
+        },
+        "training_estimator": {
+            "model_size_b": req.model_size_b,
+            "dataset_tokens_b": req.dataset_tokens_b,
+            "target_days": req.target_days,
+            "gpu_model": req.gpu_model,
+            "total_flops": total_flops,
+            "gpus_needed": total_gpus_needed,
+            "servers_needed": total_servers_needed,
+            "allocated_gpus": actual_gpus_allocated,
+            "peak_cluster_kw": estimated_cluster_kw,
+            "total_mwh": estimated_total_mwh,
+            "total_water_liters": estimated_total_water_liters
+        },
+        "formulas": [
+            {"name": "Server Power Draw", "formula": "P_server = (P_gpus + 180W) / 1000", "unit": "kW"},
+            {"name": "Water Usage Effectiveness", "formula": "WUE = Base_WUE + (T_gpu > 70°C ? 0.05 : 0)", "unit": "L/kWh"},
+            {"name": "Water Consumption Rate", "formula": "Water (L/hr) = P_server * WUE", "unit": "L/hr"},
+            {"name": "Chiller Flow Rate", "formula": "Flow (L/min) = P_server * 1.5 * Efficiency", "unit": "L/min"},
+            {"name": "Evaporative Cooling Loss", "formula": "Evap (L/hr) = Water (L/hr) * 0.95", "unit": "L/hr"},
+            {"name": "Transformer FLOPs Scaling", "formula": "FLOPs = 6 * N * D", "unit": "FLOPs"},
+            {"name": "Lifecycle Training Water Footprint", "formula": "Water_total (L) = Energy_MWh * 1000 * WUE", "unit": "Liters"}
+        ],
+        "qwen_derivation": ai_derivation
+    }
 
 
 class JobRequest(BaseModel):

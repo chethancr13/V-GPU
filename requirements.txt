@@ -9,3 +9,5 @@ moderngl
 pillow
 asyncio
 docker
+requests
+ollama

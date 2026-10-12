@@ -140,7 +140,9 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
   const [inputText, setInputText] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('vgpu-gemini-key') || '')
+  const [engineMode, setEngineMode] = useState(() => localStorage.getItem('vgpu-engine-mode') || 'ollama')
+  const [ollamaModel, setOllamaModel] = useState(() => localStorage.getItem('vgpu-ollama-model') || 'qwen2.5')
+  const [ollamaStatus, setOllamaStatus] = useState({ running: false, models: [], active_model: 'qwen2.5' })
   const [liveSnapshot, setLiveSnapshot] = useState(null)
   const [loadingLabel, setLoadingLabel] = useState('Thinking...')
   
@@ -158,7 +160,7 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
     }
   }, [isOpen, messages, isLoading])
 
-  // Fetch live metrics periodically when panel is open
+  // Fetch live metrics & Ollama status periodically when panel is open
   useEffect(() => {
     if (!isOpen) return
     const fetchMetrics = async () => {
@@ -172,8 +174,28 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
         // Silently fail — metrics badge just won't show
       }
     }
+
+    const checkOllama = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/api/ollama/status')
+        if (res.ok) {
+          const data = await res.json()
+          setOllamaStatus(data)
+          if (data.active_model && !localStorage.getItem('vgpu-ollama-model')) {
+            setOllamaModel(data.active_model)
+          }
+        }
+      } catch (e) {
+        setOllamaStatus({ running: false, models: [], active_model: 'qwen2.5' })
+      }
+    }
+
     fetchMetrics()
-    const interval = setInterval(fetchMetrics, 5000)
+    checkOllama()
+    const interval = setInterval(() => {
+      fetchMetrics()
+      checkOllama()
+    }, 5000)
     return () => clearInterval(interval)
   }, [isOpen])
 
@@ -194,9 +216,9 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
     setIsLoading(true)
 
     // Detect metrics-related queries for loading label
-    const metricsKw = ['temperature', 'temp', 'gpu', 'power', 'watt', 'vram', 'memory', 'job', 'scheduler', 'utilization', 'load', 'metrics', 'status', 'health', 'instance', 'vgpu', 'cluster']
+    const metricsKw = ['temperature', 'temp', 'gpu', 'power', 'watt', 'vram', 'memory', 'job', 'scheduler', 'utilization', 'load', 'metrics', 'status', 'health', 'instance', 'vgpu', 'cluster', 'water', 'cooling', 'wue']
     const isMetrics = metricsKw.some(kw => text.toLowerCase().includes(kw))
-    setLoadingLabel(isMetrics ? 'Scanning live metrics...' : 'Thinking...')
+    setLoadingLabel(isMetrics ? 'Computing live metrics & thermal model...' : (ollamaStatus.running ? `Consulting ${ollamaModel || 'Qwen'}...` : 'Thinking...'))
 
     // Build history for backend (limit to last 6 messages)
     const historyPayload = messages.slice(-6).map(m => ({
@@ -205,17 +227,17 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
     }))
 
     try {
-      // Use the new unified /api/chat endpoint
+      // Use the unified /api/chat endpoint with local Qwen
       const response = await fetch('http://localhost:8000/api/chat', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'X-Gemini-Key': apiKey
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           message: text,
           session_id: 'copilot_drawer',
-          api_key: apiKey,
+          preferred_engine: 'ollama',
+          model_name: ollamaModel,
           history: historyPayload
         })
       })
@@ -230,6 +252,7 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
         id: (Date.now() + 1).toString(),
         text: data.answer || 'No response received from agent.',
         sender: 'agent',
+        engine: data.engine || null,
         metricsUsed: data.metrics_used || false,
         metricsSnapshot: data.metrics_snapshot || null,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -260,13 +283,15 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
     }
   }
 
-  const handleSaveKey = (e) => {
+  const handleSaveSettings = (e) => {
     e.preventDefault()
-    localStorage.setItem('vgpu-gemini-key', apiKey)
+    localStorage.setItem('vgpu-engine-mode', engineMode)
+    localStorage.setItem('vgpu-ollama-model', ollamaModel)
     setShowSettings(false)
+    const statusMsg = `🚀 Local Qwen Engine Active (Model: ${ollamaModel})! Real-time water/power and cluster telemetry connected.`
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
-      text: apiKey.trim() ? '🔑 Gemini API Key updated! Full conversational AI with live metrics is now active.' : '🔑 Gemini API Key cleared. Using local offline engine with live metrics.',
+      text: statusMsg,
       sender: 'system',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }])
@@ -444,12 +469,12 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
 
   // Metrics-aware suggested prompt chips
   const suggestedChips = [
-    { text: '🌡️ GPU Temps', query: 'What are the current GPU temperatures?' },
-    { text: '📊 Cluster Status', query: 'Show me the cluster health overview' },
-    { text: '💾 VRAM Usage', query: 'How much VRAM is being used right now?' },
-    { text: '⚡ Active Jobs', query: 'How many jobs are currently running?' },
+    { text: '🌊 Water & Power Math', query: 'Calculate server water and power consumption step-by-step showing the exact thermodynamic formulas used and live variables' },
+    { text: '💧 70B Footprint Proof', query: 'Calculate the mathematical formulas for training a 70B parameter model with 300B tokens over 14 days (6*N*D FLOPs and water liters)' },
+    { text: '⚡ Cooling WUE Derivation', query: 'Derive the effective WUE and chiller flow equations comparing closed-loop liquid vs evaporative air cooling' },
+    { text: '🌡️ GPU Temps & Thermal Penalty', query: 'What are the current GPU temperatures and is any thermal penalty applied to water usage effectiveness?' },
+    { text: '📊 Cluster Status', query: 'Show me the cluster health overview and power draw' },
     { text: '🖥️ vGPU Instances', query: 'List all active vGPU instances' },
-    { text: '🚀 Run ML Job', query: 'How do I run an ML job?' },
   ]
 
   return (
@@ -568,7 +593,7 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
                   </span>
                 </div>
                 <div style={{ fontSize: '0.58rem', color: 'var(--text-secondary)', marginTop: '1px' }}>
-                  {apiKey ? 'Online Engine (Gemini)' : 'Offline Local Engine'} · Live Data
+                  {ollamaStatus.running ? `🟢 Local Qwen 2.5 (${ollamaModel || 'Active'})` : 'Local Heuristic Engine'} · Live Telemetry
                 </div>
               </div>
             </div>
@@ -577,7 +602,7 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
               <LiveMetricsBadge snapshot={liveSnapshot} />
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                title="API Key Settings"
+                title="Qwen Model Settings"
                 style={{
                   background: 'none',
                   border: 'none',
@@ -616,7 +641,7 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
           {/* Settings Overlay Drawer */}
           {showSettings && (
             <form
-              onSubmit={handleSaveKey}
+              onSubmit={handleSaveSettings}
               style={{
                 position: 'absolute',
                 top: '48px',
@@ -628,12 +653,14 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
                 zIndex: 10,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '0.6rem',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                gap: '0.7rem',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                maxHeight: '440px',
+                overflowY: 'auto'
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>Gemini API Key Configuration</span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>Local Qwen 2.5 AI Model</span>
                 <button
                   type="button"
                   onClick={() => setShowSettings(false)}
@@ -642,42 +669,93 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
                   <X size={14} />
                 </button>
               </div>
-              <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
-                Connect your Gemini API key to enable full conversational AI with live metrics awareness. Without a key, the Copilot uses a local engine with real-time metric data.
-              </p>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input
-                  type="password"
-                  placeholder="AIzaSy..."
-                  value={apiKey}
-                  onChange={e => setApiKey(e.target.value)}
-                  style={{
-                    flex: 1,
-                    background: 'var(--black)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    padding: '0.35rem 0.6rem',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.75rem',
-                    outline: 'none'
-                  }}
-                />
-                <button
-                  type="submit"
-                  style={{
-                    background: 'var(--accent)',
-                    color: '#000',
-                    border: 'none',
-                    borderRadius: '4px',
-                    padding: '0.35rem 0.75rem',
-                    fontWeight: 700,
-                    fontSize: '0.72rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Save
-                </button>
+
+              {/* Ollama Section */}
+              <div style={{
+                background: 'rgba(0,0,0,0.25)',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                padding: '0.6rem 0.75rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.45rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', fontWeight: 700 }}>
+                  <span style={{ color: 'var(--text-primary)' }}>🦙 Ollama Local Daemon</span>
+                  <span style={{
+                    color: ollamaStatus.running ? '#76B900' : 'var(--red, #ef4444)',
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: '0.62rem'
+                  }}>
+                    {ollamaStatus.running ? '● Connected' : '○ Not Reachable'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                  {ollamaStatus.running ? (
+                    <span>Installed models: <strong>{ollamaStatus.models?.join(', ') || 'qwen2.5:latest'}</strong></span>
+                  ) : (
+                    <span>Start your Ollama container: <code>docker exec -it ollama ollama run qwen2.5</code></span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="e.g. qwen2.5:latest or custom"
+                    value={ollamaModel}
+                    onChange={e => setOllamaModel(e.target.value)}
+                    style={{
+                      flex: 1,
+                      background: 'var(--black)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '4px',
+                      padding: '0.3rem 0.5rem',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.7rem',
+                      outline: 'none',
+                      fontFamily: 'JetBrains Mono, monospace'
+                    }}
+                  />
+                  {ollamaStatus.models && ollamaStatus.models.length > 0 && (
+                    <select
+                      value={ollamaModel}
+                      onChange={e => setOllamaModel(e.target.value)}
+                      style={{
+                        background: 'var(--dark-gray)',
+                        border: '1px solid var(--border)',
+                        color: 'var(--text-primary)',
+                        borderRadius: '4px',
+                        padding: '0.3rem 0.4rem',
+                        fontSize: '0.65rem'
+                      }}
+                    >
+                      {ollamaStatus.models.map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               </div>
+
+              <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                ⚡ <em>100% Private & Local Inference: All queries, telemetry, and calculations are computed locally via Ollama with zero cloud API keys.</em>
+              </div>
+
+              <button
+                type="submit"
+                style={{
+                  background: 'var(--accent)',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '0.45rem 0.75rem',
+                  fontWeight: 700,
+                  fontSize: '0.72rem',
+                  cursor: 'pointer',
+                  marginTop: '0.2rem'
+                }}
+              >
+                Save Model Configuration
+              </button>
             </form>
           )}
 
@@ -693,15 +771,15 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
               background: 'rgba(5, 5, 5, 0.4)'
             }}
           >
-            {!apiKey && (
+            {!ollamaStatus.running && (
               <div
                 style={{
-                  background: 'rgba(245, 158, 11, 0.08)',
-                  border: '1px dashed rgba(245, 158, 11, 0.3)',
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px dashed rgba(239, 68, 68, 0.3)',
                   borderRadius: '6px',
                   padding: '0.55rem 0.75rem',
                   fontSize: '0.68rem',
-                  color: 'var(--yellow)',
+                  color: 'var(--red, #ef4444)',
                   lineHeight: '1.4',
                   marginBottom: '0.35rem',
                   display: 'flex',
@@ -711,9 +789,9 @@ const AIComparisonAgent = memo(function AIComparisonAgent({ activeTab, setActive
                 }}
               >
                 <div style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span>⚠️ Running in Local Offline Mode</span>
+                  <span>⚠️ Ollama Daemon Not Reachable</span>
                 </div>
-                <span>Connect your Gemini API Key (🔑) to unlock full generative AI. Live metrics are always available!</span>
+                <span>Start your Ollama container to power this assistant with Qwen 2.5!</span>
               </div>
             )}
 

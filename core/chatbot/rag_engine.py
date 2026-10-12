@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 from core.chatbot.vector_store import ProjectVectorStore
 from core.chatbot.memory import ChatMemory
 from core.chatbot.hf_model import HuggingFaceModelEngine
+from core.chatbot.ollama_engine import ollama_engine
 
 SYSTEM_PROMPT = """You are the V-GPU Project Assistant, a specialized AI assistant with deep technical knowledge of this specific project (codebase, architecture, data schemas, notes, and documentation).
 
@@ -28,7 +29,7 @@ class ProjectRAGEngine:
         greetings = {"hello", "hi", "hey", "good morning", "good afternoon", "good evening", "greetings", "yo"}
         if msg_lower in greetings or any(msg_lower.startswith(g + " ") for g in greetings):
             return (
-                "Hello! 👋 I am your **V-GPU Copilot**, powered by RAG and HuggingFace/Gemini models.\n\n"
+                "Hello! 👋 I am your **V-GPU Copilot**, powered by local Qwen 2.5 and live platform telemetry.\n\n"
                 "I am deeply knowledgeable about everything in this project — codebase (`core/`), architecture, documentation (`COMMANDS.md`), data schemas (`my_data.csv`), water compute planning, and launcher scripts.\n\n"
                 "**How can I help you today?** Try asking:\n"
                 "- *\"What is the analysis of water consumption of server?\"*\n"
@@ -129,15 +130,19 @@ class ProjectRAGEngine:
                 f"{h['sender'].upper()}: {h['message']}" for h in history_items
             ]) + "\n\n"
 
-        # 3. Model Generation Routing (Gemini -> HuggingFace -> Local Synthesizer)
+        # 3. Model Generation Routing (Local Qwen Ollama -> Local Synthesizer)
         answer = None
-        if api_key:
-            answer = self._call_gemini_llm(message, context_str, history_str, api_key)
-
-        if not answer and hf_token:
-            self.hf_engine.hf_token = hf_token
-            hf_prompt = f"{history_str}PROJECT CONTEXT:\n{context_str}\n\nUSER QUESTION: {message}\n\nANSWER:"
-            answer = self.hf_engine.generate(hf_prompt, system_prompt=SYSTEM_PROMPT)
+        ollama_status = ollama_engine.get_status()
+        if ollama_status.get("running"):
+            prompt = f"{history_str}PROJECT CONTEXT:\n{context_str}\n\nUSER QUESTION: {message}\n\nANSWER:"
+            ollama_res = ollama_engine.generate(
+                prompt=prompt,
+                system_prompt=SYSTEM_PROMPT,
+                model_name=ollama_status.get("active_model", "qwen2.5:latest"),
+                format_json=False
+            )
+            if ollama_res and ollama_res.get("text"):
+                answer = ollama_res["text"]
 
         if not answer:
             answer = self._generate_analytical_local_synthesis(message, chunks)
@@ -152,28 +157,6 @@ class ProjectRAGEngine:
             "session_id": session_id
         }
 
-    def _call_gemini_llm(self, query: str, context: str, history: str, api_key: str) -> Optional[str]:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-        full_prompt = f"{SYSTEM_PROMPT}\n\n{history}PROJECT CONTEXT:\n{context}\n\nUSER QUESTION: {query}\n\nANSWER:"
-        payload = {
-            "contents": [{"parts": [{"text": full_prompt}]}],
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1200}
-        }
-        try:
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                result = json.loads(resp.read().decode('utf-8'))
-                if "candidates" in result and result["candidates"]:
-                    candidate = result["candidates"][0]
-                    if "content" in candidate and "parts" in candidate["content"]:
-                        return candidate["content"]["parts"][0]["text"].strip()
-        except Exception:
-            pass
-        return None
 
     def _generate_analytical_local_synthesis(self, query: str, chunks: List[Dict[str, Any]]) -> str:
         q_lower = query.lower()

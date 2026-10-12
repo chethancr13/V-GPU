@@ -152,24 +152,7 @@ class ProjectVectorStore:
             conn.commit()
 
     def generate_embedding(self, text: str, api_key: Optional[str] = None) -> List[float]:
-        # Optional Gemini Embeddings API if key is provided
-        if api_key:
-            try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={api_key}"
-                req_payload = {
-                    "model": "models/text-embedding-004",
-                    "content": {"parts": [{"text": text[:2000]}]}
-                }
-                req = urllib.request.Request(url, data=json.dumps(req_payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
-                with urllib.request.urlopen(req, timeout=3) as resp:
-                    data = json.loads(resp.read().decode('utf-8'))
-                    if "embedding" in data and "values" in data["embedding"]:
-                        vals = data["embedding"]["values"]
-                        # Downsample or normalize if needed
-                        return vals[:768] if len(vals) >= 768 else vals + [0.0]*(768 - len(vals))
-            except Exception:
-                pass  # Fall back seamlessly to local vectorizer
-                
+        # Purely local sub-word n-gram TF-IDF vectorizer (100% offline and fast)
         return self.local_vectorizer.vectorize(text)
 
     def hybrid_search(self, query: str, top_k: int = 6, api_key: Optional[str] = None) -> List[Dict[str, Any]]:

@@ -141,7 +141,7 @@ function App() {
     { id: 'vm_inspector', name: 'VM Inspector', icon: Box, component: VMInspector },
     { id: 'graphics', name: 'Graphics Viewer', icon: ImageIcon, component: GraphicsViewer },
     { id: 'logs', name: 'Logs', icon: FileText, component: Logs },
-    { id: 'topology', name: 'Virtualization Architecture', icon: Layers, component: VirtualizationTopology },
+    { id: 'topology', name: 'AI Neural Architecture', icon: Layers, component: VirtualizationTopology },
   ]
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component

@@ -109,10 +109,107 @@ docker ps -a --filter "name=vgpu-"
 docker ps -a -q --filter "name=vgpu-" | xargs docker rm -f
 ```
 
-## 6. Dashboards & Telemetry
+## 6. 🦙 Ollama & Qwen 2.5 Local AI Commands
+
+V-GPU is powered by an offline, local **Qwen 2.5** model via **Ollama**. It requires **zero cloud API keys**.
+
+### A. Starting the Ollama Service
+
+**Native (macOS / Windows / Linux — Recommended for GPU acceleration):**
+```bash
+# Starts the background Ollama daemon on port 11434 (if not already running)
+ollama serve
+```
+
+**Docker Container:**
+```bash
+docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
+```
+
+---
+
+### B. Pulling / Downloading Qwen Models
+
+**1. Fast 3B Model (Recommended — 1.9 GB, ultra-low latency on CPU):**
+```bash
+# Native
+ollama pull qwen2.5:3b
+
+# Docker
+docker exec -it ollama ollama pull qwen2.5:3b
+```
+
+**2. Full 7.6B Model (4.7 GB, maximum parameter reasoning):**
+```bash
+# Native
+ollama pull qwen2.5:latest
+
+# Docker
+docker exec -it ollama ollama pull qwen2.5:latest
+```
+
+---
+
+### C. Chatting with Qwen in the Terminal
+
+**Interactive Chat Session:**
+```bash
+# Native
+ollama run qwen2.5:3b
+
+# Docker
+docker exec -it ollama ollama run qwen2.5:3b
+```
+*(Type `/bye` or press `Ctrl + D` to exit).*
+
+**One-Liner Quick Prompt:**
+```bash
+ollama run qwen2.5:3b "Explain GPU VRAM in two sentences"
+```
+
+---
+
+### D. Model Management & Inspection
+
+```bash
+# List all installed models
+ollama list
+# Docker: docker exec ollama ollama list
+
+# Check which model is currently resident in RAM
+ollama ps
+# Docker: docker exec ollama ollama ps
+
+# Show model details and architecture
+ollama show qwen2.5:3b
+
+# Remove an unneeded model
+ollama rm <model-name>
+```
+
+---
+
+### E. Verifying V-GPU AI Integration
+
+```bash
+# 1. Test Ollama daemon connectivity
+curl http://localhost:11434/api/tags
+
+# 2. Test V-GPU Ollama bridge status
+curl http://localhost:8000/api/ollama/status
+
+# 3. Test Qwen thermodynamic water & power computation
+curl -X POST http://localhost:8000/api/ai/compute-water-power \
+  -H "Content-Type: application/json" \
+  -d '{"model_size_b": 70, "dataset_tokens_b": 300, "target_days": 14}'
+```
+
+---
+
+## 7. Dashboards & Telemetry
 - **Web Dashboard**: [http://localhost:5173](http://localhost:5173)
 - **Backend API**: [http://localhost:8000](http://localhost:8000)
 - **Desktop Monitor**: Opens automatically on `run`.
 
 ---
-*V-GPU - Professional AI Workstation isolation.*
+*V-GPU - Professional AI Workstation isolation & Local Qwen 2.5 Engine.*
