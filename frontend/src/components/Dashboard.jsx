@@ -300,9 +300,9 @@ function Dashboard() {
                 style={{ 
                   width: '100%', 
                   padding: '0.6rem 0.75rem', 
-                  background: '#000', 
+                  background: 'var(--input-bg)', 
                   border: '1px solid var(--border)', 
-                  color: '#fff', 
+                  color: 'var(--text-primary)', 
                   outline: 'none', 
                   borderRadius: '4px',
                   fontSize: '0.85rem'
@@ -326,9 +326,9 @@ function Dashboard() {
                 style={{ 
                   width: '100%', 
                   padding: '0.6rem 0.75rem', 
-                  background: '#000', 
+                  background: 'var(--input-bg)', 
                   border: '1px solid var(--border)', 
-                  color: '#fff', 
+                  color: 'var(--text-primary)', 
                   outline: 'none', 
                   borderRadius: '4px',
                   fontSize: '0.85rem'
@@ -350,9 +350,9 @@ function Dashboard() {
                 style={{ 
                   flex: 1, 
                   padding: '0.6rem 0.75rem', 
-                  background: '#000', 
+                  background: 'var(--input-bg)', 
                   border: '1px solid var(--border)', 
-                  color: '#fff', 
+                  color: 'var(--text-primary)', 
                   outline: 'none', 
                   borderRadius: '4px',
                   fontSize: '0.85rem'
@@ -451,7 +451,7 @@ function Dashboard() {
             className="font-mono"
             style={{ 
               flex: 1, 
-              background: '#000', 
+              background: 'var(--terminal-bg)', 
               padding: '1rem', 
               borderRadius: '6px', 
               fontSize: '0.75rem', 
@@ -461,8 +461,7 @@ function Dashboard() {
               display: 'flex', 
               flexDirection: 'column', 
               gap: '0.35rem',
-              border: '1px solid rgba(255,255,255,0.05)',
-              boxShadow: 'inset 0 0 10px rgba(0,0,0,0.8)'
+              border: '1px solid var(--border)',
             }}
           >
             {terminalLogs.map((log, index) => (

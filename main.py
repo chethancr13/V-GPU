@@ -7,9 +7,14 @@ import subprocess
 import uuid
 import random
 from typing import Optional, List, Dict
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Request
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from core.telemetry.prometheus_exporter import (
+    export_prometheus_text,
+    ai_token_tracker,
+    CONTENT_TYPE_LATEST
+)
 
 from core.vgpu_driver import physical_gpus, VGPUDevice
 from core.scheduler import scheduler
@@ -21,7 +26,16 @@ from core.chatbot.memory import ChatMemory
 from core.chatbot.metrics_collector import get_live_snapshot, format_metrics_for_prompt
 from core.chatbot.ollama_engine import ollama_engine
 
+# System Design Infrastructure Subsystems
+from core.cache import system_cache, cached
+from core.queue import async_task_queue, JobPriority, JobState
+from core.security import SecurityMiddleware, rate_limiter, security_audit_logger
+from core.backup import backup_manager
+
 app = FastAPI(title="V-GPU NVIDIA Control Plane (Monolith)")
+
+# Production Security & Network Protection Headers & Rate Limiter
+app.add_middleware(SecurityMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,8 +53,10 @@ async def root():
 # --- DIRECTORIES ---
 DATASETS_DIR = "data/datasets"
 SCRIPTS_DIR = "data/scripts"
+BACKUPS_DIR = "data/backups"
 os.makedirs(DATASETS_DIR, exist_ok=True)
 os.makedirs(SCRIPTS_DIR, exist_ok=True)
+os.makedirs(BACKUPS_DIR, exist_ok=True)
 
 # --- MODELS & STATE ---
 executor = MLJobExecutor()
@@ -50,6 +66,24 @@ chat_memory = ChatMemory()
 
 @app.on_event("startup")
 async def startup_event():
+    # Start the async worker pool for background queues
+    await async_task_queue.start()
+
+    # Register default async job handlers
+    async def handle_async_ml_job(payload: Dict) -> Dict:
+        vgpu_id = payload.get("vgpu_id", "")
+        script_name = payload.get("script", "test_script.py")
+        dataset_name = payload.get("dataset")
+        return await executor.run_ml_job(vgpu_id=vgpu_id, script_name=script_name, dataset_name=dataset_name)
+
+    async def handle_async_backup_job(payload: Dict) -> Dict:
+        label = payload.get("label", "scheduled_auto")
+        desc = payload.get("description", "Asynchronous scheduled snapshot")
+        return backup_manager.create_backup(label=label, description=desc)
+
+    async_task_queue.register_handler("ml_training", handle_async_ml_job)
+    async_task_queue.register_handler("data_backup", handle_async_backup_job)
+
     # Start the scheduler's background queue processing loop
     asyncio.create_task(scheduler.process_queue())
 
@@ -332,15 +366,15 @@ async def handle_agent_chat(message: str, active_tab: str, history: List[Dict[st
         elif "what is" in msg_lower and "project" in msg_lower:
             response_text = "This project, **V-GPU**, is an NVIDIA-inspired virtual GPU control plane that simulates physical GPUs, slices their compute/VRAM capacity, runs isolated ML training jobs inside Docker containers, and charts real-time performance telemetry. It includes scheduling queues, water-cooling environmental planners, and speed benchmarks compared to Jupyter and Google Colab."
         elif "vgpu_driver" in msg_lower or "driver" in msg_lower:
-            response_text = "The driver simulator is located in [core/vgpu_driver.py](file:///Users/chethanr/Downloads/V-GPU/core/vgpu_driver.py). It models physical GPU frames and allocates virtual nodes with custom parameters."
+            response_text = "The driver simulator is located in `core/vgpu_driver.py`. It models physical GPU frames and allocates virtual nodes with custom parameters."
         elif "scheduler" in msg_lower:
-            response_text = "The scheduler is in [core/scheduler.py](file:///Users/chethanr/Downloads/V-GPU/core/scheduler.py). It maintains a queue of ML workloads, checks resources across cluster nodes, and assigns execution slots."
+            response_text = "The scheduler is in `core/scheduler.py`. It maintains a queue of ML workloads, checks resources across cluster nodes, and assigns execution slots."
         elif "isolation" in msg_lower:
-            response_text = "Isolation enforcement is handled by [core/isolation.py](file:///Users/chethanr/Downloads/V-GPU/core/isolation.py). It verifies Docker memory bounds and CPU usage every second to ensure stable virtualization."
+            response_text = "Isolation enforcement is handled by `core/isolation.py`. It verifies Docker memory bounds and CPU usage every second to ensure stable virtualization."
         elif "executor" in msg_lower or "job" in msg_lower:
-            response_text = "ML job execution is managed by [core/job_executor.py](file:///Users/chethanr/Downloads/V-GPU/core/job_executor.py). It launches python scripts inside Docker containers using the `vgpu-worker` image."
+            response_text = "ML job execution is managed by `core/job_executor.py`. It launches python scripts inside Docker containers using the `vgpu-worker` image."
         elif "start_dev" in msg_lower or "orchestrator" in msg_lower:
-            response_text = "The developer orchestrator is at [scripts/start_dev.py](file:///Users/chethanr/Downloads/V-GPU/scripts/start_dev.py). It automates launching Docker Desktop, building the worker container image, syncing clocks, running the backend server, and launching Vite dev server."
+            response_text = "The developer orchestrator is at `scripts/start_dev.py`. It automates launching Docker Desktop, building the worker container image, syncing clocks, running the backend server, and launching Vite dev server."
         elif "provision" in msg_lower or "create" in msg_lower or "allocate" in msg_lower:
             response_text = "To provision a new virtual GPU node:\n1. Navigate to the **vGPU Manager** tab (or ask me: *'Go to vGPU Manager'*).\n2. Under 'Provision New vGPU Node', select your desired **VRAM Limit** (e.g. 4096 MB) and **Compute Speed** limit (e.g. 50%).\n3. Click **Provision Node**.\n\nThe scheduler will automatically select a physical GPU with spare capacity, start an isolated Docker container, and return the instance ID."
         elif "ml job" in msg_lower or "run job" in msg_lower or "run model" in msg_lower or "training" in msg_lower:
@@ -419,6 +453,7 @@ async def unified_chat(req: UnifiedChatRequest):
     1. Local Ollama (Qwen 2.5)
     2. Grounded local offline synthesizer fallback
     """
+    start_time = time.time()
 
     # Collect live metrics snapshot
     snapshot = get_live_snapshot()
@@ -612,12 +647,97 @@ You are embedded in the V-GPU control plane platform.
                         "🔀 **Navigation**: *\"Take me to the GPU Monitor\"*, *\"Open the scheduler\"*\n\n"
                         "*Tip: Powered by local Qwen 2.5 via Ollama with live telemetry awareness!*")
 
+    dur = max(time.time() - start_time, 0.001)
+    p_toks = ai_token_tracker.estimate_tokens(req.message)
+    c_toks = ai_token_tracker.estimate_tokens(response_text)
+    try:
+        ai_token_tracker.record_inference(
+            model="offline-fallback-synthesizer",
+            engine="local_synthesizer",
+            prompt_tokens=p_toks,
+            completion_tokens=c_toks,
+            duration_s=dur,
+            success=True,
+            call_type="chat",
+            prompt_snippet=req.message,
+            response_snippet=response_text
+        )
+    except Exception as e:
+        print(f"[Prometheus] Failed recording fallback chat inference: {e}")
+
+    token_usage = {
+        "prompt_tokens": p_toks,
+        "completion_tokens": c_toks,
+        "total_tokens": p_toks + c_toks,
+        "duration_s": round(dur, 3),
+        "tokens_per_sec": round(c_toks / max(dur, 0.001), 2)
+    }
+
     return {
         "answer": response_text,
         "navigate": detected_tab,
         "metrics_used": metrics_used,
         "metrics_snapshot": snapshot if metrics_used else None,
-        "session_id": req.session_id
+        "session_id": req.session_id,
+        "token_usage": token_usage
+    }
+
+
+@app.get("/metrics")
+async def prometheus_metrics():
+    """
+    Standard Prometheus exposition endpoint.
+    Scraped periodically by Prometheus to capture AI model tokens,
+    physical GPU utilization, vGPU instances, and green-compute water telemetry.
+    """
+    content = export_prometheus_text()
+    return Response(content=content, media_type=CONTENT_TYPE_LATEST)
+
+
+@app.get("/api/metrics/ai-tokens")
+async def get_ai_tokens_summary():
+    """
+    Returns real-time AI Model Token consumption, tokens/second rates,
+    per-model statistics, and recent inference activity for the dashboard.
+    """
+    return ai_token_tracker.get_summary()
+
+
+@app.get("/api/metrics/monitoring-status")
+async def get_monitoring_services_status():
+    """
+    Checks connectivity with Prometheus (9090) and Grafana (3001) containers.
+    """
+    import urllib.request
+    prom_online = False
+    grafana_online = False
+
+    try:
+        req = urllib.request.Request("http://localhost:9090/-/healthy")
+        with urllib.request.urlopen(req, timeout=0.8) as resp:
+            prom_online = (resp.status == 200)
+    except Exception:
+        prom_online = False
+
+    try:
+        req = urllib.request.Request("http://localhost:3001/api/health")
+        with urllib.request.urlopen(req, timeout=0.8) as resp:
+            grafana_online = (resp.status == 200)
+    except Exception:
+        grafana_online = False
+
+    return {
+        "prometheus": {
+            "online": prom_online,
+            "url": "http://localhost:9090",
+            "scrape_endpoint": "http://localhost:8000/metrics",
+        },
+        "grafana": {
+            "online": grafana_online,
+            "url": "http://localhost:3001",
+            "dashboard_url": "http://localhost:3001/d/vgpu-ai-tokens/v-gpu-cluster-ai-model-tokens-monitoring?orgId=1&kiosk=tv",
+        },
+        "tokens": ai_token_tracker.get_summary()
     }
 
 
@@ -625,6 +745,188 @@ You are embedded in the V-GPU control plane platform.
 async def get_metrics_snapshot():
     """Returns the current live metrics snapshot for the entire V-GPU platform."""
     return get_live_snapshot()
+
+
+# ---------------------------------------------------------------------------
+# SYSTEM DESIGN: CACHING LAYER REST ENDPOINTS
+# ---------------------------------------------------------------------------
+
+@app.get("/api/cache/stats")
+async def get_cache_statistics():
+    """Returns real-time L1/L2 multi-tier cache diagnostics, hit/miss rates, and tags."""
+    return system_cache.get_stats()
+
+
+class CacheClearRequest(BaseModel):
+    tag: Optional[str] = None
+
+@app.post("/api/cache/clear")
+async def clear_cache(req: CacheClearRequest):
+    """Purges the entire cache or invalidates keys associated with a specific tag."""
+    if req.tag:
+        count = system_cache.invalidate_by_tag(req.tag)
+        return {"status": "success", "invalidated_tag": req.tag, "cleared_count": count}
+    else:
+        count = system_cache.clear()
+        return {"status": "success", "cleared_count": count, "message": "All cache entries flushed"}
+
+
+# ---------------------------------------------------------------------------
+# SYSTEM DESIGN: ASYNCHRONOUS TASK QUEUE & DLQ ENDPOINTS
+# ---------------------------------------------------------------------------
+
+class EnqueueTaskRequest(BaseModel):
+    name: str = "ml_training"
+    payload: Optional[Dict[str, Any]] = None
+    priority: Optional[str] = "NORMAL"  # CRITICAL, HIGH, NORMAL, LOW
+    max_retries: Optional[int] = 3
+    idempotency_key: Optional[str] = None
+
+@app.post("/api/queue/enqueue")
+async def enqueue_async_task(req: EnqueueTaskRequest):
+    """
+    Enqueues a background task into the resilient priority queue with exponential retry backoff.
+    """
+    priority_enum = getattr(JobPriority, req.priority.upper(), JobPriority.NORMAL)
+    record = await async_task_queue.enqueue(
+        name=req.name,
+        payload=req.payload or {},
+        priority=priority_enum,
+        max_retries=req.max_retries or 3,
+        idempotency_key=req.idempotency_key
+    )
+    return {"status": "enqueued", "job": record.to_dict()}
+
+
+@app.get("/api/queue/stats")
+async def get_queue_statistics():
+    """Returns worker pool utilization, queue depths, DLQ sizes, and recent task records."""
+    return async_task_queue.get_stats()
+
+
+@app.get("/api/queue/jobs/{job_id}")
+async def get_queue_job(job_id: str):
+    """Inspects detailed execution status, progress, and retry history for a specific job."""
+    record = async_task_queue.get_job(job_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return record.to_dict()
+
+
+@app.post("/api/queue/jobs/{job_id}/replay")
+async def replay_dead_letter_job(job_id: str):
+    """Replays an exhausted task from the Dead-Letter Queue (DLQ)."""
+    success = await async_task_queue.replay_dlq_job(job_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Job not found in Dead-Letter Queue or already active.")
+    return {"status": "replayed", "job_id": job_id}
+
+
+@app.delete("/api/queue/jobs/{job_id}")
+async def cancel_queue_job(job_id: str):
+    """Cancels a pending or retrying task."""
+    cancelled = async_task_queue.cancel_job(job_id)
+    if not cancelled:
+        raise HTTPException(status_code=400, detail="Job cannot be cancelled (already running or completed).")
+    return {"status": "cancelled", "job_id": job_id}
+
+
+# ---------------------------------------------------------------------------
+# SYSTEM DESIGN: SECURITY, RATE LIMITING & AUDIT LOG ENDPOINTS
+# ---------------------------------------------------------------------------
+
+@app.get("/api/security/status")
+async def get_security_posture():
+    """Returns active DDoS rate limiter parameters, quarantined IPs, and security posture."""
+    return {
+        "rate_limiter": {
+            "burst_limit": rate_limiter.burst_limit,
+            "refill_rate_per_sec": rate_limiter.rate_per_sec,
+            "total_tracked_ips": len(rate_limiter.buckets),
+            "blocked_ips_count": len(rate_limiter.blocked_ips),
+            "blocked_ips": list(rate_limiter.blocked_ips)
+        },
+        "security_headers": {
+            "CSP": "Enabled (Strict frame-ancestors & self)",
+            "HSTS": "Enabled (max-age=31536000)",
+            "X-Frame-Options": "SAMEORIGIN",
+            "X-Content-Type-Options": "nosniff"
+        },
+        "audit_logs_count": len(security_audit_logger.logs)
+    }
+
+
+@app.get("/api/security/audit-logs")
+async def get_security_audit_logs(limit: int = 50):
+    """Returns chronological tamper-evident security audit events."""
+    return security_audit_logger.get_recent(limit=limit)
+
+
+class IPBlockRequest(BaseModel):
+    ip: str
+    reason: Optional[str] = "Manual operator quarantine"
+
+@app.post("/api/security/block-ip")
+async def manual_block_ip(req: IPBlockRequest):
+    """Quarantines or blocks an IP address at the application firewall level."""
+    rate_limiter.manual_block(req.ip, reason=req.reason or "Manual Admin Block")
+    return {"status": "blocked", "ip": req.ip}
+
+
+@app.post("/api/security/unblock-ip")
+async def manual_unblock_ip(req: IPBlockRequest):
+    """Removes an IP address from quarantine."""
+    rate_limiter.manual_unblock(req.ip)
+    return {"status": "unblocked", "ip": req.ip}
+
+
+# ---------------------------------------------------------------------------
+# SYSTEM DESIGN: DISASTER RECOVERY & BACKUP MANAGEMENT ENDPOINTS
+# ---------------------------------------------------------------------------
+
+class BackupCreateRequest(BaseModel):
+    label: Optional[str] = "manual_snapshot"
+    description: Optional[str] = ""
+
+@app.post("/api/backup/create")
+async def trigger_backup_snapshot(req: BackupCreateRequest):
+    """Creates a full cryptographic SHA-256 snapshot archive of databases and configuration."""
+    manifest = backup_manager.create_backup(label=req.label or "manual_snapshot", description=req.description or "")
+    security_audit_logger.log("BACKUP_CREATED", "INFO", "127.0.0.1", "/api/backup/create", f"ID: {manifest['backup_id']}")
+    return {"status": "success", "manifest": manifest}
+
+
+@app.get("/api/backup/list")
+async def list_cluster_backups():
+    """Lists all available disaster recovery snapshots with SHA-256 integrity signatures."""
+    return backup_manager.list_backups()
+
+
+@app.post("/api/backup/{backup_id}/verify")
+async def verify_backup_integrity(backup_id: str):
+    """Validates cryptographic checksum and tar structure of a snapshot."""
+    return backup_manager.verify_backup(backup_id)
+
+
+@app.post("/api/backup/{backup_id}/restore")
+async def restore_cluster_state(backup_id: str):
+    """Restores cluster databases and state from a verified snapshot archive."""
+    try:
+        result = backup_manager.restore_backup(backup_id)
+        security_audit_logger.log("BACKUP_RESTORED", "WARNING", "127.0.0.1", f"/api/backup/{backup_id}/restore", f"Restored {backup_id}")
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/backup/{backup_id}")
+async def delete_cluster_backup(backup_id: str):
+    """Permanently deletes a designated backup archive."""
+    success = backup_manager.delete_backup(backup_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Backup not found")
+    return {"status": "deleted", "backup_id": backup_id}
+
 
 
 class WaterPowerComputeRequest(BaseModel):

@@ -473,13 +473,22 @@ function CatWalker({ isWalking: isEnabled }) {
         )
       })}
 
-      {/* Extra CSS for hover effects via a small style tag */}
+      {/* Extra CSS for hover effects and light mode support via a small style tag */}
       <style>{`
         .cat-walker-container:hover .cat-tooltip {
           opacity: 1 !important;
         }
         .cat-walker-container:hover .cat-glow {
           opacity: 1 !important;
+        }
+        [data-theme="light"] .cat-tooltip {
+          background: rgba(255, 255, 255, 0.94) !important;
+          color: #0f172a !important;
+          border: 1px solid rgba(0, 0, 0, 0.1) !important;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1) !important;
+        }
+        [data-theme="light"] .cat-glow {
+          background: radial-gradient(circle, rgba(212, 163, 106, 0.35) 0%, transparent 70%) !important;
         }
       `}</style>
     </>

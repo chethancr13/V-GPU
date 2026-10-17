@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 2s
+  evaluation_interval: 2s
+
+scrape_configs:
+  # Scrape the Prometheus server itself
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Scrape the V-GPU Control Plane FastAPI backend & AI Model Token Monitor
+  - job_name: "vgpu_control_plane"
+    metrics_path: "/metrics"
+    scrape_interval: 2s
+    scrape_timeout: 2s
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          service: "vgpu-backend"
+          environment: "production-simulation"

@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Server, Box, GitCompare,
   Image as ImageIcon, FileText, Settings,
   HelpCircle, Bell, Search, Cpu as CpuIcon, Activity, Network, Droplet,
-  Sun, Moon, Monitor, Bot, Layers, Zap
+  Sun, Moon, Monitor, Bot, Zap, Gauge
 } from 'lucide-react'
 
 // Dashboard is eagerly loaded (visible on startup)
@@ -26,14 +26,16 @@ const ComputeComparison = lazy(() => import('./components/ComputeComparison'))
 const Logs = lazy(() => import('./components/Logs'))
 const AIComparisonAgent = lazy(() => import('./components/AIComparisonAgent'))
 const ProjectAIChatbot = lazy(() => import('./components/ProjectAIChatbot'))
-const VirtualizationTopology = lazy(() => import('./components/VirtualizationTopology'))
 const BoltAccelerator3D = lazy(() => import('./components/BoltAccelerator3D'))
+const MonitoringDashboard = lazy(() => import('./components/MonitoringDashboard'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 10000, // 10s TTL prevents refetch floods on tab change
+      staleTime: 60000, // 60s in-memory cache — instantaneous tab switching without refetch freezes
+      gcTime: 300000,   // Keep cached data in RAM for 5 minutes
       refetchOnWindowFocus: false,
+      refetchOnMount: false,
       retry: 1,
     },
   },
@@ -67,7 +69,6 @@ function LoadingSpinner() {
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [visitedTabs, setVisitedTabs] = useState(() => new Set(['dashboard']))
 
   // Preload lazy tab modules in background so tab switching is instantaneous
   useEffect(() => {
@@ -82,8 +83,8 @@ function App() {
       import('./components/ComputeComparison')
       import('./components/Logs')
       import('./components/ProjectAIChatbot')
-      import('./components/VirtualizationTopology')
       import('./components/BoltAccelerator3D')
+      import('./components/MonitoringDashboard')
     }
     if (typeof window !== 'undefined') {
       if ('requestIdleCallback' in window) {
@@ -95,16 +96,6 @@ function App() {
       }
     }
   }, [])
-
-  // Keep visited tabs in cache so switching is 0ms and retains state
-  useEffect(() => {
-    setVisitedTabs(prev => {
-      if (prev.has(activeTab)) return prev
-      const next = new Set(prev)
-      next.add(activeTab)
-      return next
-    })
-  }, [activeTab])
 
   //  Theme State — default to dark mode
   const [theme, setTheme] = useState(() => {
@@ -130,6 +121,7 @@ function App() {
   //  Navigation Tabs 
   const tabs = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, component: Dashboard },
+    { id: 'monitoring', name: 'Prometheus & Grafana', icon: Gauge, component: MonitoringDashboard },
     { id: 'bolt_3d', name: '3D Accelerator Model', icon: Zap, component: BoltAccelerator3D },
     { id: 'vgpu', name: 'vGPU Manager', icon: Server, component: VGPUManager },
     { id: 'project_chatbot', name: 'Project AI Assistant', icon: Bot, component: ProjectAIChatbot },
@@ -141,7 +133,6 @@ function App() {
     { id: 'vm_inspector', name: 'VM Inspector', icon: Box, component: VMInspector },
     { id: 'graphics', name: 'Graphics Viewer', icon: ImageIcon, component: GraphicsViewer },
     { id: 'logs', name: 'Logs', icon: FileText, component: Logs },
-    { id: 'topology', name: 'AI Neural Architecture', icon: Layers, component: VirtualizationTopology },
   ]
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component
@@ -411,24 +402,10 @@ function App() {
               </div>
             </header>
 
-            {/* Page Content — Keep visited tabs alive in DOM with display: contents / none */}
+            {/* Page Content — Instant 0ms Tab Switching with Clean Component Lifecycle */}
             <main style={{ flex: 1, overflowY: 'auto', background: 'var(--black)', position: 'relative' }}>
               <Suspense fallback={<LoadingSpinner />}>
-                {tabs.map(tab => {
-                  if (!visitedTabs.has(tab.id)) return null
-                  const Component = tab.component
-                  const isActive = activeTab === tab.id
-                  return (
-                    <div
-                      key={tab.id}
-                      style={{
-                        display: isActive ? 'contents' : 'none',
-                      }}
-                    >
-                      <Component theme={theme} isActive={isActive} />
-                    </div>
-                  )
-                })}
+                {ActiveComponent && <ActiveComponent theme={theme} isActive={true} />}
               </Suspense>
             </main>
             <Suspense fallback={null}>

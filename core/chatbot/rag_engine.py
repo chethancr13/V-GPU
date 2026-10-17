@@ -1,4 +1,5 @@
 import json
+import time
 import re
 import urllib.request
 from typing import List, Dict, Any, Optional
@@ -145,7 +146,26 @@ class ProjectRAGEngine:
                 answer = ollama_res["text"]
 
         if not answer:
+            t0 = time.time()
             answer = self._generate_analytical_local_synthesis(message, chunks)
+            dur = max(time.time() - t0, 0.001)
+            try:
+                from core.telemetry.prometheus_exporter import ai_token_tracker
+                p_toks = ai_token_tracker.estimate_tokens(message + "\n" + context_str)
+                c_toks = ai_token_tracker.estimate_tokens(answer)
+                ai_token_tracker.record_inference(
+                    model="analytical-rag-synthesizer",
+                    engine="local_synthesizer",
+                    prompt_tokens=p_toks,
+                    completion_tokens=c_toks,
+                    duration_s=dur,
+                    success=True,
+                    call_type="rag_query",
+                    prompt_snippet=message,
+                    response_snippet=answer
+                )
+            except Exception as e:
+                print(f"[Prometheus] Error recording local synthesizer tokens: {e}")
 
         # Store in memory
         self.memory.add_message(session_id, "user", message)

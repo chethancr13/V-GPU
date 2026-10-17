@@ -849,6 +849,7 @@ function AcceleratorBoardModel({
 
 // ─── MAIN COMPONENT ───
 export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
+  const isLight = theme === 'light'
   const [exploded, setExploded] = useState(0)
   const [isExploding, setIsExploding] = useState(false)
   const [autoRotate, setAutoRotate] = useState(false) // Default false so it aligns with the photo first!
@@ -944,17 +945,27 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
         height: '100%',
         width: '100%',
         position: 'relative',
-        backgroundColor: bgStyle === 'grid' ? '#070b14' : '#030406',
-        backgroundImage: bgStyle === 'grid' ? `
-          linear-gradient(rgba(56, 189, 248, 0.08) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(56, 189, 248, 0.08) 1px, transparent 1px),
-          linear-gradient(rgba(56, 189, 248, 0.02) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(56, 189, 248, 0.02) 1px, transparent 1px),
-          radial-gradient(ellipse 65% 55% at 50% 50%, rgba(14, 165, 233, 0.14) 0%, transparent 80%)
-        ` : 'radial-gradient(circle at center, #11141c 0%, #000000 100%)',
+        backgroundColor: isLight
+          ? (bgStyle === 'grid' ? '#f1f5f9' : '#e2e8f0')
+          : (bgStyle === 'grid' ? '#070b14' : '#030406'),
+        backgroundImage: isLight
+          ? (bgStyle === 'grid' ? `
+              linear-gradient(rgba(14, 165, 233, 0.12) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(14, 165, 233, 0.12) 1px, transparent 1px),
+              linear-gradient(rgba(14, 165, 233, 0.04) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(14, 165, 233, 0.04) 1px, transparent 1px),
+              radial-gradient(ellipse 70% 60% at 50% 50%, rgba(255, 255, 255, 0.95) 0%, rgba(226, 232, 240, 0.85) 100%)
+            ` : 'radial-gradient(circle at center, #ffffff 0%, #cbd5e1 100%)')
+          : (bgStyle === 'grid' ? `
+              linear-gradient(rgba(56, 189, 248, 0.08) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(56, 189, 248, 0.08) 1px, transparent 1px),
+              linear-gradient(rgba(56, 189, 248, 0.02) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(56, 189, 248, 0.02) 1px, transparent 1px),
+              radial-gradient(ellipse 65% 55% at 50% 50%, rgba(14, 165, 233, 0.14) 0%, transparent 80%)
+            ` : 'radial-gradient(circle at center, #11141c 0%, #000000 100%)'),
         backgroundSize: bgStyle === 'grid' ? '100px 100px, 100px 100px, 20px 20px, 20px 20px, 100% 100%' : '100% 100%',
         overflow: 'hidden',
-        color: '#f8fafc',
+        color: isLight ? '#0f172a' : '#f8fafc',
         fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
         transition: 'background 0.3s ease'
       }}
@@ -963,15 +974,15 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
       <div style={{ flex: 1, position: 'relative', height: '100%' }}>
         <Canvas
           camera={{ position: [12, 10, 14.5], fov: 36 }}
-          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
+          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: isLight ? 1.4 : 1.3 }}
           shadows
         >
-          <ambientLight intensity={0.7} />
+          <ambientLight intensity={isLight ? 1.2 : 0.7} />
 
           {/* Main Key Studio Light matching reference photo */}
           <directionalLight
             position={[12, 18, 14]}
-            intensity={2.0}
+            intensity={isLight ? 2.3 : 2.0}
             castShadow
             shadow-mapSize={[2048, 2048]}
           />
@@ -979,7 +990,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
           {/* Cool Rim Light highlighting PCB dark edges & cables */}
           <directionalLight
             position={[-14, -6, -12]}
-            intensity={0.9}
+            intensity={isLight ? 0.7 : 0.9}
             color="#38bdf8"
           />
 
@@ -1012,7 +1023,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
           {/* 3D Perspective CAD Floor Grid (visible when grid background is active) */}
           {bgStyle === 'grid' && (
             <gridHelper
-              args={[34, 34, '#0ea5e9', '#1e293b']}
+              args={[34, 34, isLight ? '#0284c7' : '#0ea5e9', isLight ? '#cbd5e1' : '#1e293b']}
               position={[0, -0.28, 0]}
             />
           )}
@@ -1069,7 +1080,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                   fontWeight: 800,
                   letterSpacing: '0.04em',
                   textTransform: 'uppercase',
-                  background: 'linear-gradient(90deg, #ffffff 0%, #cbd5e1 100%)',
+                  background: isLight ? 'linear-gradient(90deg, #0f172a 0%, #334155 100%)' : 'linear-gradient(90deg, #ffffff 0%, #cbd5e1 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   lineHeight: 1.2
@@ -1080,7 +1091,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               <div
                 style={{
                   fontSize: '0.7rem',
-                  color: '#94a3b8',
+                  color: isLight ? '#64748b' : '#94a3b8',
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
                   display: 'flex',
@@ -1109,12 +1120,12 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               display: 'flex',
               alignItems: 'center',
               gap: '0.35rem',
-              background: 'rgba(15, 23, 42, 0.88)',
+              background: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(15, 23, 42, 0.88)',
               backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(56, 189, 248, 0.22)',
+              border: isLight ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(56, 189, 248, 0.22)',
               padding: '0.32rem 0.45rem',
               borderRadius: '12px',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+              boxShadow: isLight ? '0 8px 32px rgba(0, 0, 0, 0.08)' : '0 8px 32px rgba(0, 0, 0, 0.5)',
               pointerEvents: 'auto',
               flexShrink: 0
             }}
@@ -1132,7 +1143,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                 border: 'none',
                 cursor: 'pointer',
                 background: viewMode === 'normal' ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
-                color: viewMode === 'normal' ? '#38bdf8' : '#94a3b8',
+                color: viewMode === 'normal' ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#64748b' : '#94a3b8'),
                 transition: 'all 0.2s ease'
               }}
             >
@@ -1153,7 +1164,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                 border: 'none',
                 cursor: 'pointer',
                 background: viewMode === 'thermal' ? 'rgba(239, 68, 68, 0.2)' : 'transparent',
-                color: viewMode === 'thermal' ? '#f87171' : '#94a3b8',
+                color: viewMode === 'thermal' ? '#ef4444' : (isLight ? '#64748b' : '#94a3b8'),
                 transition: 'all 0.2s ease'
               }}
             >
@@ -1174,7 +1185,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                 border: 'none',
                 cursor: 'pointer',
                 background: viewMode === 'wireframe' ? 'rgba(168, 85, 247, 0.2)' : 'transparent',
-                color: viewMode === 'wireframe' ? '#c084fc' : '#94a3b8',
+                color: viewMode === 'wireframe' ? '#a855f7' : (isLight ? '#64748b' : '#94a3b8'),
                 transition: 'all 0.2s ease'
               }}
             >
@@ -1182,10 +1193,10 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               Wireframe X-Ray
             </button>
 
-            {/* Background Style Toggle (Grid vs Studio Dark) */}
+            {/* Background Style Toggle (Grid vs Studio Dark/Light) */}
             <button
               onClick={() => setBgStyle(prev => prev === 'grid' ? 'studio' : 'grid')}
-              title="Toggle Grid / Studio Dark Background"
+              title="Toggle Grid / Studio Background"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -1196,16 +1207,16 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                 borderRadius: '8px',
                 border: 'none',
                 cursor: 'pointer',
-                background: bgStyle === 'grid' ? 'rgba(14, 165, 233, 0.2)' : 'rgba(255, 255, 255, 0.06)',
-                color: bgStyle === 'grid' ? '#38bdf8' : '#94a3b8',
+                background: bgStyle === 'grid' ? (isLight ? 'rgba(2, 132, 199, 0.15)' : 'rgba(14, 165, 233, 0.2)') : (isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.06)'),
+                color: bgStyle === 'grid' ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#64748b' : '#94a3b8'),
                 transition: 'all 0.2s ease'
               }}
             >
               <Grid size={13} />
-              {bgStyle === 'grid' ? 'CAD Grid' : 'Studio Dark'}
+              {bgStyle === 'grid' ? 'CAD Grid' : (isLight ? 'Studio Light' : 'Studio Dark')}
             </button>
 
-            <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.15)', margin: '0 0.2rem' }} />
+            <div style={{ width: '1px', height: '16px', background: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)', margin: '0 0.2rem' }} />
 
             <button
               onClick={() => setShowPhotoComparison(prev => !prev)}
@@ -1220,7 +1231,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                 border: 'none',
                 cursor: 'pointer',
                 background: showPhotoComparison ? 'rgba(234, 179, 8, 0.2)' : 'transparent',
-                color: showPhotoComparison ? '#facc15' : '#94a3b8',
+                color: showPhotoComparison ? '#eab308' : (isLight ? '#64748b' : '#94a3b8'),
                 transition: 'all 0.2s ease'
               }}
             >
@@ -1253,13 +1264,13 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               display: 'flex',
               alignItems: 'center',
               gap: '0.45rem',
-              background: 'rgba(15, 23, 42, 0.88)',
+              background: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(15, 23, 42, 0.88)',
               backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              border: isLight ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(255, 255, 255, 0.1)',
               padding: '0.4rem 0.6rem',
               borderRadius: '12px',
               pointerEvents: 'auto',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+              boxShadow: isLight ? '0 8px 32px rgba(0, 0, 0, 0.08)' : '0 8px 32px rgba(0, 0, 0, 0.4)'
             }}
           >
             {/* Explode / Assembly Toggle */}
@@ -1274,9 +1285,9 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                 fontWeight: 600,
                 borderRadius: '8px',
                 border: '1px solid',
-                borderColor: isExploding ? '#38bdf8' : 'rgba(255,255,255,0.1)',
-                background: isExploding ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255,255,255,0.05)',
-                color: isExploding ? '#38bdf8' : '#e2e8f0',
+                borderColor: isExploding ? '#0284c7' : isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
+                background: isExploding ? (isLight ? 'rgba(2, 132, 199, 0.15)' : 'rgba(56, 189, 248, 0.15)') : (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.05)'),
+                color: isExploding ? '#0284c7' : (isLight ? '#0f172a' : '#e2e8f0'),
                 cursor: 'pointer'
               }}
             >
@@ -1295,9 +1306,9 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                 fontSize: '0.76rem',
                 fontWeight: 600,
                 borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.1)',
-                background: autoRotate ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.05)',
-                color: autoRotate ? '#34d399' : '#94a3b8',
+                border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
+                background: autoRotate ? 'rgba(16, 185, 129, 0.15)' : (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.05)'),
+                color: autoRotate ? '#10b981' : (isLight ? '#64748b' : '#94a3b8'),
                 cursor: 'pointer'
               }}
             >
@@ -1316,9 +1327,9 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                 fontSize: '0.76rem',
                 fontWeight: 600,
                 borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.1)',
-                background: activeSignalFlow ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255,255,255,0.05)',
-                color: activeSignalFlow ? '#38bdf8' : '#94a3b8',
+                border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
+                background: activeSignalFlow ? (isLight ? 'rgba(2, 132, 199, 0.15)' : 'rgba(56, 189, 248, 0.15)') : (isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.05)'),
+                color: activeSignalFlow ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#64748b' : '#94a3b8'),
                 cursor: 'pointer'
               }}
             >
@@ -1326,7 +1337,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               Data Flow
             </button>
 
-            <div style={{ width: '1px', height: '18px', background: 'rgba(255,255,255,0.15)', margin: '0 0.2rem' }} />
+            <div style={{ width: '1px', height: '18px', background: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)', margin: '0 0.2rem' }} />
 
             {/* Camera Presets matching reference angles */}
             <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>ANGLES:</span>
@@ -1334,9 +1345,9 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               onClick={() => applyPreset('photo_angle')}
               title="Align with user reference photo"
               style={{
-                background: 'rgba(56, 189, 248, 0.12)',
-                border: '1px solid rgba(56, 189, 248, 0.3)',
-                color: '#38bdf8',
+                background: isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(56, 189, 248, 0.12)',
+                border: isLight ? '1px solid rgba(2, 132, 199, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)',
+                color: isLight ? '#0284c7' : '#38bdf8',
                 fontSize: '0.72rem',
                 cursor: 'pointer',
                 padding: '0.25rem 0.55rem',
@@ -1351,7 +1362,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#cbd5e1',
+                color: isLight ? '#475569' : '#cbd5e1',
                 fontSize: '0.72rem',
                 cursor: 'pointer',
                 padding: '0.25rem 0.5rem',
@@ -1365,7 +1376,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#cbd5e1',
+                color: isLight ? '#475569' : '#cbd5e1',
                 fontSize: '0.72rem',
                 cursor: 'pointer',
                 padding: '0.25rem 0.5rem',
@@ -1379,7 +1390,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#cbd5e1',
+                color: isLight ? '#475569' : '#cbd5e1',
                 fontSize: '0.72rem',
                 cursor: 'pointer',
                 padding: '0.25rem 0.5rem',
@@ -1393,7 +1404,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#cbd5e1',
+                color: isLight ? '#475569' : '#cbd5e1',
                 fontSize: '0.72rem',
                 cursor: 'pointer',
                 padding: '0.25rem 0.5rem',
@@ -1407,7 +1418,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#cbd5e1',
+                color: isLight ? '#475569' : '#cbd5e1',
                 fontSize: '0.72rem',
                 cursor: 'pointer',
                 padding: '0.25rem 0.5rem',
@@ -1424,46 +1435,46 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               display: 'flex',
               alignItems: 'center',
               gap: '1.1rem',
-              background: 'rgba(15, 23, 42, 0.88)',
+              background: isLight ? 'rgba(255, 255, 255, 0.92)' : 'rgba(15, 23, 42, 0.88)',
               backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(56, 189, 248, 0.2)',
+              border: isLight ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(56, 189, 248, 0.2)',
               padding: '0.45rem 1.1rem',
               borderRadius: '12px',
               pointerEvents: 'auto',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+              boxShadow: isLight ? '0 8px 32px rgba(0, 0, 0, 0.08)' : '0 8px 32px rgba(0, 0, 0, 0.4)'
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600 }}>CORE CLOCK</span>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#38bdf8' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isLight ? '#0284c7' : '#38bdf8' }}>
                 {telemetry.clockGhz} GHz
               </span>
             </div>
-            <div style={{ width: '1px', height: '18px', background: 'rgba(255,255,255,0.1)' }} />
+            <div style={{ width: '1px', height: '18px', background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)' }} />
 
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600 }}>FP8 COMPUTE</span>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f8fafc' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isLight ? '#0f172a' : '#f8fafc' }}>
                 {telemetry.tflopsFp8} TFLOPS
               </span>
             </div>
-            <div style={{ width: '1px', height: '18px', background: 'rgba(255,255,255,0.1)' }} />
+            <div style={{ width: '1px', height: '18px', background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)' }} />
 
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600 }}>HBM3e BANDWIDTH</span>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#a855f7' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isLight ? '#7c3aed' : '#a855f7' }}>
                 {telemetry.memoryBw} TB/s
               </span>
             </div>
-            <div style={{ width: '1px', height: '18px', background: 'rgba(255,255,255,0.1)' }} />
+            <div style={{ width: '1px', height: '18px', background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)' }} />
 
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600 }}>POWER (TDP)</span>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isLight ? '#d97706' : '#f59e0b' }}>
                 {telemetry.powerWatts} W
               </span>
             </div>
-            <div style={{ width: '1px', height: '18px', background: 'rgba(255,255,255,0.1)' }} />
+            <div style={{ width: '1px', height: '18px', background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)' }} />
 
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600 }}>CORE TEMP</span>
@@ -1483,22 +1494,23 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               left: '1.5rem',
               zIndex: 20,
               width: '460px',
-              background: 'rgba(15, 23, 42, 0.95)',
+              background: isLight ? 'rgba(255, 255, 255, 0.98)' : 'rgba(15, 23, 42, 0.95)',
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(56, 189, 248, 0.35)',
+              border: isLight ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(56, 189, 248, 0.35)',
               borderRadius: '14px',
               padding: '1rem',
-              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8)'
+              boxShadow: isLight ? '0 20px 50px rgba(0, 0, 0, 0.15)' : '0 20px 50px rgba(0, 0, 0, 0.8)',
+              color: isLight ? '#0f172a' : '#f8fafc'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ImageIcon size={16} color="#38bdf8" />
-                <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Original Reference Card Photo</span>
+                <ImageIcon size={16} color={isLight ? '#0284c7' : '#38bdf8'} />
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isLight ? '#0f172a' : '#f8fafc' }}>Original Reference Card Photo</span>
               </div>
               <button
                 onClick={() => setShowPhotoComparison(false)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.8rem', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: isLight ? '#64748b' : '#94a3b8', fontSize: '0.8rem', cursor: 'pointer' }}
               >
                 ✕
               </button>
@@ -1507,7 +1519,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
               style={{
                 borderRadius: '8px',
                 overflow: 'hidden',
-                border: '1px solid rgba(255,255,255,0.1)',
+                border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(255,255,255,0.1)',
                 background: '#000000'
               }}
             >
@@ -1517,7 +1529,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                 style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain' }}
               />
             </div>
-            <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '0.6rem 0 0 0', lineHeight: 1.45 }}>
+            <p style={{ fontSize: '0.72rem', color: isLight ? '#475569' : '#94a3b8', margin: '0.6rem 0 0 0', lineHeight: 1.45 }}>
               Compare the 3D model directly against the original photo. Notice the identical beveled silver BOLT lid, stepped mezzanine memory cards, 16-phase VRM, twinax DAC cables, and tall vertical black terminal blocks.
             </p>
           </div>
@@ -1528,14 +1540,15 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
       <aside
         style={{
           width: '380px',
-          background: 'rgba(13, 17, 26, 0.95)',
+          background: isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(13, 17, 26, 0.95)',
           backdropFilter: 'blur(24px)',
-          borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+          borderLeft: isLight ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
           flexDirection: 'column',
           padding: '1.5rem',
           zIndex: 10,
-          overflowY: 'auto'
+          overflowY: 'auto',
+          color: isLight ? '#0f172a' : '#f8fafc'
         }}
       >
         {/* Component Selector Tabs */}
@@ -1557,18 +1570,18 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                     padding: '0.55rem 0.7rem',
                     borderRadius: '8px',
                     border: '1px solid',
-                    borderColor: active ? '#0284c7' : 'rgba(255,255,255,0.06)',
-                    background: active ? 'rgba(2, 132, 199, 0.15)' : 'rgba(255,255,255,0.02)',
-                    color: active ? '#ffffff' : '#94a3b8',
+                    borderColor: active ? '#0284c7' : (isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'),
+                    background: active ? (isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(2, 132, 199, 0.15)') : (isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'),
+                    color: active ? '#0284c7' : (isLight ? '#475569' : '#94a3b8'),
                     cursor: 'pointer',
                     textAlign: 'left',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: active ? '#38bdf8' : '#e2e8f0' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: active ? '#0284c7' : (isLight ? '#0f172a' : '#e2e8f0') }}>
                     {comp.name.split(' ')[0]} {comp.name.split(' ')[1] || ''}
                   </span>
-                  <span style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  <span style={{ fontSize: '0.62rem', color: isLight ? '#64748b' : '#64748b', marginTop: '0.15rem' }}>
                     {comp.category}
                   </span>
                 </button>
@@ -1580,8 +1593,9 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
         {/* Selected Component Detail Card */}
         <div
           style={{
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.03)',
+            border: isLight ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.08)',
+            boxShadow: isLight ? '0 2px 12px rgba(0, 0, 0, 0.04)' : 'none',
             borderRadius: '12px',
             padding: '1.25rem',
             display: 'flex',
@@ -1597,7 +1611,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                   fontSize: '0.65rem',
                   fontWeight: 700,
                   textTransform: 'uppercase',
-                  color: '#38bdf8',
+                  color: isLight ? '#0284c7' : '#38bdf8',
                   letterSpacing: '0.06em'
                 }}
               >
@@ -1607,7 +1621,7 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                 style={{
                   fontSize: '0.65rem',
                   background: 'rgba(16, 185, 129, 0.15)',
-                  color: '#34d399',
+                  color: '#10b981',
                   padding: '0.15rem 0.45rem',
                   borderRadius: '4px',
                   fontWeight: 600
@@ -1616,16 +1630,16 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                 ONLINE
               </span>
             </div>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, margin: '0.35rem 0 0 0', color: '#f8fafc' }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, margin: '0.35rem 0 0 0', color: isLight ? '#0f172a' : '#f8fafc' }}>
               {selectedPartData.name}
             </h2>
-            <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '0.5rem 0 0 0', lineHeight: 1.45 }}>
+            <p style={{ fontSize: '0.78rem', color: isLight ? '#475569' : '#94a3b8', margin: '0.5rem 0 0 0', lineHeight: 1.45 }}>
               {selectedPartData.description}
             </p>
           </div>
 
           {/* Specifications Key-Value List */}
-          <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '0.85rem' }}>
+          <div style={{ borderTop: isLight ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '0.85rem' }}>
             <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.08em', marginBottom: '0.6rem' }}>
               HARDWARE SPECIFICATIONS
             </div>
@@ -1639,11 +1653,11 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
                     justifyContent: 'space-between',
                     fontSize: '0.76rem',
                     padding: '0.3rem 0',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.03)'
+                    borderBottom: isLight ? '1px solid rgba(0, 0, 0, 0.04)' : '1px solid rgba(255, 255, 255, 0.03)'
                   }}
                 >
-                  <span style={{ color: '#94a3b8' }}>{label}</span>
-                  <span style={{ fontWeight: 600, color: '#e2e8f0', textAlign: 'right' }}>{val}</span>
+                  <span style={{ color: isLight ? '#64748b' : '#94a3b8' }}>{label}</span>
+                  <span style={{ fontWeight: 600, color: isLight ? '#0f172a' : '#e2e8f0', textAlign: 'right' }}>{val}</span>
                 </div>
               ))}
             </div>
@@ -1653,19 +1667,19 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
         {/* Architecture Benchmark & Virtualization Status */}
         <div
           style={{
-            background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(56, 189, 248, 0.02) 100%)',
-            border: '1px solid rgba(56, 189, 248, 0.2)',
+            background: isLight ? 'linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(56, 189, 248, 0.04) 100%)' : 'linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(56, 189, 248, 0.02) 100%)',
+            border: isLight ? '1px solid rgba(2, 132, 199, 0.2)' : '1px solid rgba(56, 189, 248, 0.2)',
             borderRadius: '12px',
             padding: '1.1rem'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <ShieldCheck size={16} color="#38bdf8" />
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#38bdf8' }}>
+            <ShieldCheck size={16} color={isLight ? '#0284c7' : '#38bdf8'} />
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isLight ? '#0284c7' : '#38bdf8' }}>
               vGPU Virtualization Ready
             </span>
           </div>
-          <p style={{ fontSize: '0.74rem', color: '#94a3b8', margin: 0, lineHeight: 1.4 }}>
+          <p style={{ fontSize: '0.74rem', color: isLight ? '#475569' : '#94a3b8', margin: 0, lineHeight: 1.4 }}>
             Direct hardware partitioning supports up to 8 isolated vGPU slices with full SR-IOV mediated pass-through and hardware memory encryption.
           </p>
         </div>

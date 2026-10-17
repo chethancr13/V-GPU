@@ -26,7 +26,7 @@ python3 vgpu_launcher.py tauri
 
 On macOS and Windows, Docker Desktop runs inside a virtual machine. When the host system sleeps and wakes up, the VM's clock drifts and falls behind the host time. This causes ML job scheduling mismatches, log timestamp drift, and API failures.
 
-To solve this, we have automated the startup lifecycle. When you run `npm run tauri dev` (or `python3 vgpu_launcher.py tauri`), a startup orchestrator script [start_dev.py](file:///Users/chethanr/Downloads/V-GPU/scripts/start_dev.py) automatically handles the following:
+To solve this, we have automated the startup lifecycle. When you run `npm run tauri dev` (or `python3 vgpu_launcher.py tauri`), a startup orchestrator script [start_dev.py](scripts/start_dev.py) automatically handles the following:
 1. **Verifies Docker status**: Checks if Docker is running. On macOS, if it's shut down, it automatically launches Docker Desktop (`open -a Docker`) and waits for it to become ready.
 2. **Checks/Builds Container**: Verifies if the dedicated V-GPU worker image (`vgpu-worker`) exists, and builds it if missing.
 3. **Syncs the VM Clock**: Runs a privileged sync command to update the Docker VM time to host time.
@@ -206,10 +206,60 @@ curl -X POST http://localhost:8000/api/ai/compute-water-power \
 
 ---
 
+---
+
 ## 7. Dashboards & Telemetry
+
 - **Web Dashboard**: [http://localhost:5173](http://localhost:5173)
 - **Backend API**: [http://localhost:8000](http://localhost:8000)
-- **Desktop Monitor**: Opens automatically on `run`.
+- **Prometheus Metrics Target**: [http://localhost:8000/metrics](http://localhost:8000/metrics)
+- **Prometheus Server UI**: [http://localhost:9090](http://localhost:9090)
+- **Grafana Monitoring Dashboard**: [http://localhost:3001](http://localhost:3001) (Auto-login enabled)
+- **AI Token Monitor API**: [http://localhost:8000/api/metrics/ai-tokens](http://localhost:8000/api/metrics/ai-tokens)
 
 ---
-*V-GPU - Professional AI Workstation isolation & Local Qwen 2.5 Engine.*
+
+## 8. Prometheus & Grafana Monitoring Stack
+
+### Start Monitoring Containers
+```bash
+# Via launcher shortcut:
+python3 vgpu_launcher.py monitoring
+
+# OR direct script:
+python3 scripts/start_monitoring.py --open
+
+# OR via docker compose:
+docker compose -f docker-compose.monitoring.yml up -d
+```
+
+### Stop Monitoring Containers
+```bash
+python3 vgpu_launcher.py monitoring-down
+# OR
+docker compose -f docker-compose.monitoring.yml down
+```
+
+### Monitored Metrics Overview
+- **AI Model Tokens & Latency**:
+  - `vgpu_ai_tokens_prompt_total` (Prompt / Input tokens count)
+  - `vgpu_ai_tokens_completion_total` (Completion / Output tokens count)
+  - `vgpu_ai_tokens_total` (Aggregated total tokens)
+  - `vgpu_ai_tokens_per_second` (Instantaneous generation velocity)
+  - `vgpu_ai_inference_duration_seconds` (Histogram latency buckets)
+- **Physical GPU Hardware Telemetry**:
+  - `vgpu_physical_gpu_utilization_percent` (Core utilization 0-100%)
+  - `vgpu_physical_gpu_memory_used_mb` & `vgpu_physical_gpu_memory_total_mb`
+  - `vgpu_physical_gpu_temperature_celsius` & `vgpu_physical_gpu_power_watts`
+- **vGPU Virtualization & Scheduler**:
+  - `vgpu_instances_active_count` & `vgpu_instances_allocated_vram_mb`
+  - `vgpu_scheduler_jobs_active` & `vgpu_scheduler_jobs_pending`
+- **Green-Compute / Water Telemetry**:
+  - `vgpu_server_total_power_kw`
+  - `vgpu_effective_wue_liters_per_kwh`
+  - `vgpu_water_consumption_liters_per_hour`
+  - `vgpu_chiller_flow_rate_liters_per_min`
+
+---
+*V-GPU - Professional AI Workstation isolation, Local Qwen 2.5 Engine, & Prometheus/Grafana Telemetry.*
+

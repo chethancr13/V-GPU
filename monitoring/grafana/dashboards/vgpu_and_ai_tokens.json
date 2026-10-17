@@ -1,0 +1,673 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "🧠 AI Model Tokens & LLM Inference Monitor",
+      "type": "row"
+    },
+    {
+      "id": 1,
+      "title": "Total AI Tokens Processed",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "purple", "value": 1000 },
+              { "color": "green", "value": 5000 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "expr": "sum(vgpu_ai_tokens_total) or vector(0)",
+          "legendFormat": "Total Tokens",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Prompt (Input) Tokens",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "cyan", "value": null },
+              { "color": "blue", "value": 2000 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "expr": "sum(vgpu_ai_tokens_prompt_total) or vector(0)",
+          "legendFormat": "Prompt Tokens",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Completion (Output) Tokens",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3000 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "expr": "sum(vgpu_ai_tokens_completion_total) or vector(0)",
+          "legendFormat": "Completion Tokens",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "AI Generation Velocity (Tokens/s)",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "gray", "value": null },
+              { "color": "yellow", "value": 15 },
+              { "color": "green", "value": 35 },
+              { "color": "purple", "value": 70 }
+            ]
+          },
+          "max": 150,
+          "min": 0,
+          "unit": "reqps"
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "expr": "sum(vgpu_ai_tokens_per_second) or vector(0)",
+          "legendFormat": "Velocity (Tokens/s)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "AI Token Consumption Rate Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "auto"
+          },
+          "unit": "short"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (model) (rate(vgpu_ai_tokens_total[30s]))",
+          "legendFormat": "{{model}} (Tokens/s Rate)",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(vgpu_ai_tokens_per_second)",
+          "legendFormat": "Instantaneous Speed",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Tokens Breakdown by AI Model & Engine",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "orientation": "vertical",
+        "showValue": "auto",
+        "stacking": "normal"
+      },
+      "targets": [
+        {
+          "expr": "sum by (model, engine) (vgpu_ai_tokens_prompt_total)",
+          "legendFormat": "{{model}} ({{engine}}) - Prompt",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (model, engine) (vgpu_ai_tokens_completion_total)",
+          "legendFormat": "{{model}} ({{engine}}) - Completion",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "id": 200,
+      "title": "⚡ Physical GPU Hardware & Cluster Utilization",
+      "type": "row"
+    },
+    {
+      "id": 11,
+      "title": "Physical GPU Utilization (%)",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          },
+          "max": 100,
+          "min": 0,
+          "unit": "percent"
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false },
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "expr": "vgpu_physical_gpu_utilization_percent",
+          "legendFormat": "GPU {{gpu_id}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "GPU Memory (VRAM) Occupancy (MB)",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "max": 24576,
+          "min": 0,
+          "unit": "decbytes"
+        }
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "expr": "vgpu_physical_gpu_memory_used_mb * 1024 * 1024",
+          "legendFormat": "GPU {{gpu_id}} VRAM Used",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Thermal Sensors (°C) & Power Draw (W)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "vgpu_physical_gpu_temperature_celsius",
+          "legendFormat": "GPU {{gpu_id}} Temp (°C)",
+          "refId": "A"
+        },
+        {
+          "expr": "vgpu_physical_gpu_power_watts",
+          "legendFormat": "GPU {{gpu_id}} Power (W)",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+      "id": 300,
+      "title": "🔀 Virtual GPU Instances & Scheduler Queue",
+      "type": "row"
+    },
+    {
+      "id": 21,
+      "title": "Active vGPU Instances",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 21 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "expr": "vgpu_instances_active_count",
+          "legendFormat": "Active vGPUs",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "title": "Allocated Virtual VRAM",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 21 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "purple", "value": null }
+            ]
+          },
+          "unit": "decbytes"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "expr": "vgpu_instances_allocated_vram_mb * 1024 * 1024",
+          "legendFormat": "Allocated VRAM",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "title": "Scheduler Workload Pipeline",
+      "type": "timeseries",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 21 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2
+          },
+          "unit": "short"
+        }
+      },
+      "targets": [
+        {
+          "expr": "vgpu_scheduler_jobs_active",
+          "legendFormat": "Active Executing Jobs",
+          "refId": "A"
+        },
+        {
+          "expr": "vgpu_scheduler_jobs_pending",
+          "legendFormat": "Pending Queue Jobs",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "id": 400,
+      "title": "🌊 Green-Compute & Server Water Cooling Telemetry",
+      "type": "row"
+    },
+    {
+      "id": 31,
+      "title": "Server Power Draw (kW)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 26 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "yellow", "value": null }]
+          },
+          "unit": "kwatt"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "expr": "vgpu_server_total_power_kw",
+          "legendFormat": "Power (kW)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "title": "Effective Water Usage Effectiveness (WUE)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 26 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.32 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "expr": "vgpu_effective_wue_liters_per_kwh",
+          "legendFormat": "WUE (L/kWh)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "title": "Water Consumption (L/hr) & Chiller Flow (L/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 26 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "vgpu_water_consumption_liters_per_hour",
+          "legendFormat": "Water Consumption (L/hr)",
+          "refId": "A"
+        },
+        {
+          "expr": "vgpu_chiller_flow_rate_liters_per_min",
+          "legendFormat": "Chiller Flow Rate (L/min)",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "id": 500,
+      "title": "🛡️ Production System Design: Cache, Async Queues & Security Shield",
+      "type": "row"
+    },
+    {
+      "id": 41,
+      "title": "Cache Hit Ratio (%)",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 31 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "green", "value": 80 }
+            ]
+          },
+          "max": 100,
+          "min": 0,
+          "unit": "percent"
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "expr": "vgpu_cache_hit_ratio_percent or vector(0)",
+          "legendFormat": "Hit Ratio",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "title": "L1 Cache Items in Memory",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 31 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "expr": "vgpu_cache_size_items or vector(0)",
+          "legendFormat": "Cached Keys",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "title": "Async Task Queue (Pending / Active)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 31 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "orange", "value": 15 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "expr": "vgpu_async_queue_pending_jobs or vector(0)",
+          "legendFormat": "Pending Jobs",
+          "refId": "A"
+        },
+        {
+          "expr": "vgpu_async_queue_active_jobs or vector(0)",
+          "legendFormat": "Active Executing",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "title": "Security Shield (Quarantined IPs & DLQ)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 31 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "expr": "vgpu_security_blocked_ips_count or vector(0)",
+          "legendFormat": "Blocked IPs",
+          "refId": "A"
+        },
+        {
+          "expr": "vgpu_async_queue_dead_letter_count or vector(0)",
+          "legendFormat": "Dead-Letter Jobs",
+          "refId": "B"
+        }
+      ]
+    }
+  ],
+  "refresh": "2s",
+  "schemaVersion": 36,
+  "style": "dark",
+  "tags": ["v-gpu", "ai-tokens", "llm", "monitoring", "telemetry"],
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["1s", "2s", "5s", "10s", "30s", "1m"]
+  },
+  "timezone": "browser",
+  "title": "V-GPU Cluster & AI Model Tokens Monitoring",
+  "uid": "vgpu-ai-tokens",
+  "version": 1
+}

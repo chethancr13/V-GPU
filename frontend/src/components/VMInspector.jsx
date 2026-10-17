@@ -292,13 +292,13 @@ function VMInspector() {
               
               {/* CPU-Z Carbon Hardware diagnostics card */}
               <div style={{ 
-                background: '#0d0d0d', 
-                border: '1.5px solid #222', 
+                background: 'var(--card-bg)', 
+                border: '1px solid var(--border)', 
                 borderRadius: '8px', 
                 padding: '1.25rem',
                 display: 'flex',
                 flexDirection: 'column',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+                boxShadow: 'var(--card-shadow)',
                 position: 'relative'
               }}>
                 {/* Hardware header */}
@@ -451,7 +451,7 @@ function VMInspector() {
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Real-Time area plot</span>
                 </div>
                 
-                <div style={{ background: '#050505', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.75rem', flex: 1, minHeight: '180px' }}>
+                <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.75rem', flex: 1, minHeight: '180px' }}>
                   {telemetryHistory.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={telemetryHistory} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
@@ -498,7 +498,7 @@ function VMInspector() {
                 <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Memory pressure scan</span>
               </div>
               
-              <div style={{ background: '#050505', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.75rem', height: '160px' }}>
+              <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.75rem', height: '160px' }}>
                 {telemetryHistory.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={telemetryHistory} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>

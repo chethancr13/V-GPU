@@ -532,9 +532,9 @@ function VGPUManager() {
                 style={{ 
                   width: '100%', 
                   padding: '0.6rem 0.75rem', 
-                  background: '#000', 
+                  background: 'var(--input-bg)', 
                   border: '1px solid var(--border)', 
-                  color: '#fff', 
+                  color: 'var(--text-primary)', 
                   outline: 'none', 
                   borderRadius: '4px',
                   fontSize: '0.85rem'

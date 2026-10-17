@@ -103,6 +103,16 @@ def main():
                 pass
             return
 
+        if command in ["monitoring", "grafana", "prometheus"]:
+            script_path = os.path.join(os.getcwd(), "scripts", "start_monitoring.py")
+            subprocess.run([sys.executable, script_path, "--open"])
+            return
+
+        if command in ["monitoring-down", "stop-monitoring"]:
+            script_path = os.path.join(os.getcwd(), "scripts", "stop_monitoring.py")
+            subprocess.run([sys.executable, script_path])
+            return
+
         if command == "clean":
             print(" Cleaning up all vGPU instances and containers...")
             try:

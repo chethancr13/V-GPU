@@ -65,7 +65,7 @@ function Logs() {
         </div>
 
         <div style={{ 
-          background: '#050505', 
+          background: 'var(--terminal-bg)', 
           border: '1px solid var(--border)', 
           borderRadius: '6px', 
           padding: '1.25rem', 

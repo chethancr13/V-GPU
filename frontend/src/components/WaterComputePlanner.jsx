@@ -285,7 +285,7 @@ function WaterComputePlanner({ isActive = true }) {
   }
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', background: '#070b0e', minHeight: '100%', color: '#c9d1d9' }}>
+    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', background: 'var(--black)', minHeight: '100%', color: 'var(--text-primary)' }}>
       
       {/* Styles for animated flow pipelines */}
       <style>{`

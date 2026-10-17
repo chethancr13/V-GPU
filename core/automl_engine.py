@@ -109,9 +109,9 @@ class AutoMLEngine:
         for col in df.columns:
             if df[col].isnull().any():
                 if df[col].dtype in [np.float64, np.int64]:
-                    df[col].fillna(df[col].median(), inplace=True)
+                    df[col] = df[col].fillna(df[col].median())
                 else:
-                    df[col].fillna(df[col].mode()[0], inplace=True)
+                    df[col] = df[col].fillna(df[col].mode()[0])
         
         # Simple Outlier Capping (3 sigma)
         for col in df.select_dtypes(include=[np.number]).columns:

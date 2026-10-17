@@ -1,0 +1,19 @@
+{
+  "backup_id": "backup_smoke_test_20261017_225834",
+  "label": "smoke_test",
+  "description": "Unit test snapshot",
+  "timestamp": 1792258120.7336059,
+  "iso_time": "2026-10-17T17:28:40Z",
+  "size_bytes": 6374431,
+  "size_mb": 6.079,
+  "sha256": "ddd3cead27b5660a9307d0d918c731c93110e66b9ff615edafb21b2ecba1a20a",
+  "included_files": [
+    "data/chatbot_index.db",
+    "data/chatbot_history.db",
+    "data/datasets",
+    "core/telemetry/prometheus_exporter.py",
+    "docker-compose.monitoring.yml",
+    "monitoring/prometheus/prometheus.yml"
+  ],
+  "duration_seconds": 6.384
+}

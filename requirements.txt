@@ -11,3 +11,6 @@ asyncio
 docker
 requests
 ollama
+prometheus-client
+pandas
+python-multipart

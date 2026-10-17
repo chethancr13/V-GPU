@@ -1,4 +1,5 @@
 import json
+import time
 import urllib.request
 import urllib.error
 import asyncio
@@ -119,6 +120,7 @@ class OllamaEngine:
         if format_json:
             payload["format"] = "json"
 
+        start_time = time.time()
         try:
             req = urllib.request.Request(
                 url,
@@ -128,6 +130,7 @@ class OllamaEngine:
             )
             with urllib.request.urlopen(req, timeout=90) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
+                duration_s = max(time.time() - start_time, 0.001)
                 raw_text = data.get("message", {}).get("content", "").strip()
 
                 if not raw_text:
@@ -139,6 +142,43 @@ class OllamaEngine:
                 if not clean_text and raw_text:
                     clean_text = raw_text
 
+                # Extract token metrics directly from Ollama response, fallback to heuristic
+                prompt_tokens = data.get("prompt_eval_count")
+                completion_tokens = data.get("eval_count")
+                if prompt_tokens is None or prompt_tokens <= 0:
+                    from core.telemetry.prometheus_exporter import ai_token_tracker
+                    prompt_tokens = ai_token_tracker.estimate_tokens(prompt + " " + system_prompt)
+                if completion_tokens is None or completion_tokens <= 0:
+                    from core.telemetry.prometheus_exporter import ai_token_tracker
+                    completion_tokens = ai_token_tracker.estimate_tokens(clean_text)
+
+                total_tokens = prompt_tokens + completion_tokens
+
+                # Record into Prometheus & in-memory tracker
+                try:
+                    from core.telemetry.prometheus_exporter import ai_token_tracker
+                    ai_token_tracker.record_inference(
+                        model=target_model,
+                        engine="ollama",
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        duration_s=duration_s,
+                        success=True,
+                        call_type="chat",
+                        prompt_snippet=prompt,
+                        response_snippet=clean_text
+                    )
+                except Exception as ex:
+                    print(f"[Prometheus] Failed recording Ollama inference: {ex}")
+
+                token_usage = {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": total_tokens,
+                    "duration_s": round(duration_s, 3),
+                    "tokens_per_sec": round(completion_tokens / max(duration_s, 0.001), 2)
+                }
+
                 # Attempt to parse structured JSON
                 try:
                     parsed = json.loads(clean_text)
@@ -147,7 +187,8 @@ class OllamaEngine:
                         "navigate": parsed.get("navigate"),
                         "metrics_used": parsed.get("metrics_used", True),
                         "model": target_model,
-                        "raw": clean_text
+                        "raw": clean_text,
+                        "token_usage": token_usage
                     }
                 except Exception:
                     # If model returned direct markdown text rather than JSON
@@ -156,10 +197,27 @@ class OllamaEngine:
                         "navigate": None,
                         "metrics_used": True,
                         "model": target_model,
-                        "raw": clean_text
+                        "raw": clean_text,
+                        "token_usage": token_usage
                     }
 
         except Exception as e:
+            duration_s = max(time.time() - start_time, 0.001)
+            try:
+                from core.telemetry.prometheus_exporter import ai_token_tracker
+                prompt_tokens = ai_token_tracker.estimate_tokens(prompt)
+                ai_token_tracker.record_inference(
+                    model=target_model,
+                    engine="ollama",
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=0,
+                    duration_s=duration_s,
+                    success=False,
+                    call_type="chat",
+                    prompt_snippet=prompt
+                )
+            except Exception:
+                pass
             print(f"Ollama generation failed ({target_model}): {e}")
             return None
 

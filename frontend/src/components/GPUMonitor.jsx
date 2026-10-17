@@ -167,7 +167,7 @@ function GPUMonitor() {
             <Activity size={16} color="var(--accent)" />
             Real-time GPU Compute Load
           </h3>
-          <div style={{ background: '#050505', border: '1px solid var(--border)', borderRadius: '6px', padding: '1rem 0.5rem 0.5rem 0.5rem' }}>
+          <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: '6px', padding: '1rem 0.5rem 0.5rem 0.5rem' }}>
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={history} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
@@ -188,7 +188,7 @@ function GPUMonitor() {
             <Database size={16} color="var(--blue)" />
             Real-time VRAM Allocation
           </h3>
-          <div style={{ background: '#050505', border: '1px solid var(--border)', borderRadius: '6px', padding: '1rem 0.5rem 0.5rem 0.5rem' }}>
+          <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: '6px', padding: '1rem 0.5rem 0.5rem 0.5rem' }}>
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={history} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
@@ -209,7 +209,7 @@ function GPUMonitor() {
             <Thermometer size={16} color="var(--yellow)" />
             Real-time Temperatures
           </h3>
-          <div style={{ background: '#050505', border: '1px solid var(--border)', borderRadius: '6px', padding: '1rem 0.5rem 0.5rem 0.5rem' }}>
+          <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: '6px', padding: '1rem 0.5rem 0.5rem 0.5rem' }}>
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={history} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
@@ -230,7 +230,7 @@ function GPUMonitor() {
             <Zap size={16} color="var(--yellow)" />
             Real-time Power Consumption
           </h3>
-          <div style={{ background: '#050505', border: '1px solid var(--border)', borderRadius: '6px', padding: '1rem 0.5rem 0.5rem 0.5rem' }}>
+          <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: '6px', padding: '1rem 0.5rem 0.5rem 0.5rem' }}>
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={history} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
@@ -313,7 +313,7 @@ function GPUMonitor() {
                 </div>
 
                 {/* Substats */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', background: '#050505', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', background: 'var(--surface-0)', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border)' }}>
                   <div>
                     <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Load</div>
                     <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)' }}>{gpuMetrics.gpu_utilization.toFixed(1)}%</div>
@@ -338,7 +338,7 @@ function GPUMonitor() {
                     <span>Power Allocation</span>
                     <span style={{ fontWeight: 700 }}>{gpuMetrics.power_draw.toFixed(0)}W / 350W</span>
                   </div>
-                  <div style={{ height: '6px', background: '#050505', borderRadius: '3px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                  <div style={{ height: '6px', background: 'var(--surface-0)', borderRadius: '3px', border: '1px solid var(--border)', overflow: 'hidden' }}>
                     <div 
                       style={{ 
                         height: '100%', 
@@ -366,7 +366,7 @@ function GPUMonitor() {
                         <div 
                           key={inst.id}
                           style={{
-                            background: '#050505',
+                            background: 'var(--surface-0)',
                             border: '1px solid var(--border)',
                             borderRadius: '4px',
                             padding: '0.5rem 0.75rem',

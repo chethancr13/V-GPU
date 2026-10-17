@@ -35,6 +35,10 @@
   --select-option-bg: #111111;
   --toggle-track-dark: #2a2a2a;
   --sidebar-hover: rgba(255,255,255,0.02);
+  --card-bg: #111111;
+  --card-bg-subtle: #16181d;
+  --card-border: rgba(255, 255, 255, 0.08);
+  --terminal-bg: #090a0f;
 }
 
 /* ─── LIGHT MODE ───────────────────────────────────────────────────── */
@@ -72,6 +76,10 @@
   --select-option-bg: #f5f7fa;
   --toggle-track-dark: #cbd5e1;
   --sidebar-hover: rgba(0,0,0,0.03);
+  --card-bg: #ffffff;
+  --card-bg-subtle: #f8fafc;
+  --card-border: rgba(0, 0, 0, 0.08);
+  --terminal-bg: #f8fafc;
 }
 
 /* ─── THEME TRANSITION ─────────────────────────────────────────────── */
@@ -106,6 +114,39 @@ html:not([data-theme="light"]) div.page-container {
               #020617 !important; /* Deep slate blue-black background */
 }
 
+/* ─── LIGHT MODE GLOBAL CONTAINER OVERRIDES ─── */
+[data-theme="light"] body,
+[data-theme="light"] main {
+  background-color: var(--black) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] div[style*="background: #0e141a"],
+[data-theme="light"] div[style*="background: rgb(14, 20, 26)"],
+[data-theme="light"] div[style*="background: #11161d"],
+[data-theme="light"] div[style*="background: #070b0e"],
+[data-theme="light"] div[style*="background: #0a0f14"] {
+  background: var(--dark-gray) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="light"] div[style*="background: #050505"],
+[data-theme="light"] div[style*="background: #090a0f"],
+[data-theme="light"] div[style*="background: #000"] {
+  background: var(--gray) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="light"] select[style*="background: #070b0e"],
+[data-theme="light"] select[style*="background: #050505"],
+[data-theme="light"] select[style*="background: #000"] {
+  background: var(--input-bg) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
 /* ─── LIQUID GLASS BACKGROUND BLOBS ─── */
 .liquid-blob-container {
   position: absolute;
@@ -114,14 +155,18 @@ html:not([data-theme="light"]) div.page-container {
   z-index: 0;
   opacity: 0.85;
   pointer-events: none;
+  contain: strict;
+  transform: translateZ(0);
 }
 
 .liquid-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(130px);
+  filter: blur(80px);
   mix-blend-mode: screen;
   opacity: 0.16;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 [data-theme="light"] .liquid-blob {
@@ -157,54 +202,41 @@ html:not([data-theme="light"]) div.page-container {
 }
 
 @keyframes floatBlob1 {
-  0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(70px, 80px) scale(1.12); }
-  100% { transform: translate(-30px, 140px) scale(0.96); }
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(70px, 80px, 0) scale(1.12); }
+  100% { transform: translate3d(-30px, 140px, 0) scale(0.96); }
 }
 
 @keyframes floatBlob2 {
-  0% { transform: translate(0, 0) scale(1.08); }
-  50% { transform: translate(-80px, -60px) scale(0.92); }
-  100% { transform: translate(50px, -120px) scale(1.04); }
+  0% { transform: translate3d(0, 0, 0) scale(1.08); }
+  50% { transform: translate3d(-80px, -60px, 0) scale(0.92); }
+  100% { transform: translate3d(50px, -120px, 0) scale(1.04); }
 }
 
 @keyframes floatBlob3 {
-  0% { transform: translate(0, 0) scale(0.92); }
-  50% { transform: translate(120px, -70px) scale(1.18); }
-  100% { transform: translate(-40px, 30px) scale(1); }
+  0% { transform: translate3d(0, 0, 0) scale(0.92); }
+  50% { transform: translate3d(120px, -70px, 0) scale(1.18); }
+  100% { transform: translate3d(-40px, 30px, 0) scale(1); }
 }
 
-/* ─── LIQUID GLASS CARD / ACRYLIC EFFECT ─── */
-html:not([data-theme="light"]) aside.sidebar,
-html:not([data-theme="light"]) header,
-html:not([data-theme="light"]) div[style*="background: var(--gray)"],
-html:not([data-theme="light"]) div[style*="background: var(--dark-gray)"],
-html:not([data-theme="light"]) div[style*="background-color: var(--gray)"],
-html:not([data-theme="light"]) div[style*="background: var(--surface-1)"],
-html:not([data-theme="light"]) div[style*="background-color: var(--surface-1)"],
-html:not([data-theme="light"]) div[style*="background: var(--surface-2)"],
-html:not([data-theme="light"]) div[style*="background-color: var(--surface-2)"] {
-  background: rgba(10, 15, 30, 0.32) !important;
-  backdrop-filter: blur(28px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.22) !important;
+/* ─── HARDWARE-ACCELERATED GLASSMORPHISM ─── */
+/* Target only structural surfaces instead of expensive wildcard DOM queries */
+aside,
+header,
+.glass-panel {
+  background: rgba(14, 18, 28, 0.75) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-[data-theme="light"] aside.sidebar,
+[data-theme="light"] aside,
 [data-theme="light"] header,
-[data-theme="light"] div[style*="background: var(--gray)"],
-[data-theme="light"] div[style*="background: var(--dark-gray)"],
-[data-theme="light"] div[style*="background-color: var(--gray)"],
-[data-theme="light"] div[style*="background: var(--surface-1)"],
-[data-theme="light"] div[style*="background-color: var(--surface-1)"],
-[data-theme="light"] div[style*="background: var(--surface-2)"],
-[data-theme="light"] div[style*="background-color: var(--surface-2)"] {
-  background: rgba(255, 255, 255, 0.52) !important;
-  backdrop-filter: blur(28px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.28) !important;
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.03) !important;
+[data-theme="light"] .glass-panel {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
 }
 
 .font-mono {
