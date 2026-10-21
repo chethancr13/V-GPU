@@ -520,13 +520,25 @@ You are embedded in the V-GPU control plane platform.
                 nav = ollama_res.get("navigate")
                 if nav not in navigation_map:
                     nav = None
+                # Extract real token usage from Ollama response
+                tu = ollama_res.get("token_usage", {})
+                token_usage = {
+                    "prompt_tokens": tu.get("prompt_tokens", ai_token_tracker.estimate_tokens(req.message)),
+                    "completion_tokens": tu.get("completion_tokens", ai_token_tracker.estimate_tokens(ollama_res["text"])),
+                    "total_tokens": tu.get("total_tokens", 0),
+                    "duration_s": tu.get("duration_s", 0),
+                    "tokens_per_sec": tu.get("tokens_per_sec", 0)
+                }
+                if token_usage["total_tokens"] == 0:
+                    token_usage["total_tokens"] = token_usage["prompt_tokens"] + token_usage["completion_tokens"]
                 return {
                     "answer": ollama_res["text"],
                     "navigate": nav or detected_tab,
                     "metrics_used": ollama_res.get("metrics_used", is_metrics_query),
                     "metrics_snapshot": snapshot if is_metrics_query else None,
                     "session_id": req.session_id,
-                    "engine": f"Qwen 2.5 ({target_model})"
+                    "engine": f"Qwen 2.5 ({target_model})",
+                    "token_usage": token_usage
                 }
     except Exception as oe:
         print(f"Ollama local inference failed, falling back to local synthesizer: {oe}")
@@ -679,6 +691,7 @@ You are embedded in the V-GPU control plane platform.
         "metrics_used": metrics_used,
         "metrics_snapshot": snapshot if metrics_used else None,
         "session_id": req.session_id,
+        "engine": "Local Grounded Synthesizer",
         "token_usage": token_usage
     }
 

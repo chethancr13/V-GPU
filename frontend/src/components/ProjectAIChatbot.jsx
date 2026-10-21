@@ -636,7 +636,9 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
         text: data.answer,
         citations: data.citations || [],
         metricsUsed: data.metrics_used || false,
-        metricsSnapshot: data.metrics_snapshot || null
+        metricsSnapshot: data.metrics_snapshot || null,
+        tokenUsage: data.token_usage || null,
+        engine: data.engine || null
       }
 
       setMessages(prev => [...prev, assistantMsg])
@@ -1581,6 +1583,130 @@ export default function ProjectAIChatbot({ theme, isActive = true }) {
                                 </button>
                               ))}
                             </div>
+                          </div>
+                        )}
+
+                        {/* AI Model Token Usage & Thinking Display */}
+                        {msg.tokenUsage && (
+                          <div style={{
+                            marginTop: '0.75rem',
+                            paddingTop: '0.65rem',
+                            borderTop: '1px solid var(--border, rgba(0,0,0,0.06))'
+                          }}>
+                            <div style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              color: '#f59e0b',
+                              marginBottom: '0.4rem',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.04em',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.3rem'
+                            }}>
+                              <Zap size={11} />
+                              AI Model Token Usage
+                            </div>
+                            <div style={{
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: '0.4rem',
+                              marginBottom: '0.35rem'
+                            }}>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                background: 'rgba(59, 130, 246, 0.1)',
+                                color: '#3b82f6',
+                                border: '1px solid rgba(59, 130, 246, 0.2)',
+                                borderRadius: '5px',
+                                padding: '2px 8px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                fontFamily: 'JetBrains Mono, monospace'
+                              }}>
+                                <CornerDownLeft size={10} />
+                                Prompt: {msg.tokenUsage.prompt_tokens} tokens
+                              </span>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                background: 'rgba(16, 185, 129, 0.1)',
+                                color: '#10b981',
+                                border: '1px solid rgba(16, 185, 129, 0.2)',
+                                borderRadius: '5px',
+                                padding: '2px 8px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                fontFamily: 'JetBrains Mono, monospace'
+                              }}>
+                                <Sparkles size={10} />
+                                Completion: {msg.tokenUsage.completion_tokens} tokens
+                              </span>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                background: 'rgba(139, 92, 246, 0.1)',
+                                color: '#8b5cf6',
+                                border: '1px solid rgba(139, 92, 246, 0.2)',
+                                borderRadius: '5px',
+                                padding: '2px 8px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                fontFamily: 'JetBrains Mono, monospace'
+                              }}>
+                                Total: {msg.tokenUsage.total_tokens} tokens
+                              </span>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                background: 'rgba(245, 158, 11, 0.1)',
+                                color: '#f59e0b',
+                                border: '1px solid rgba(245, 158, 11, 0.2)',
+                                borderRadius: '5px',
+                                padding: '2px 8px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                fontFamily: 'JetBrains Mono, monospace'
+                              }}>
+                                <Clock size={10} />
+                                {msg.tokenUsage.duration_s}s
+                              </span>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                background: 'rgba(236, 72, 153, 0.1)',
+                                color: '#ec4899',
+                                border: '1px solid rgba(236, 72, 153, 0.2)',
+                                borderRadius: '5px',
+                                padding: '2px 8px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                fontFamily: 'JetBrains Mono, monospace'
+                              }}>
+                                <Zap size={10} />
+                                {msg.tokenUsage.tokens_per_sec} tok/s
+                              </span>
+                            </div>
+                            {msg.engine && (
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                                fontSize: '0.65rem',
+                                color: '#76B900',
+                                fontWeight: 600,
+                                fontFamily: 'JetBrains Mono, monospace'
+                              }}>
+                                <Cpu size={10} />
+                                Engine: {msg.engine}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
