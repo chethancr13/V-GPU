@@ -3,8 +3,8 @@ import CatWalker from './components/PixelCatWalker'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MetricsProvider } from './contexts/MetricsContext'
 import {
-  LayoutDashboard, Server, Box, GitCompare,
-  Image as ImageIcon, FileText, Settings,
+  LayoutDashboard, Server,
+  Image as ImageIcon, Settings,
   HelpCircle, Bell, Search, Cpu as CpuIcon, Activity, Network, Droplet,
   Sun, Moon, Monitor, Bot, Zap, Gauge
 } from 'lucide-react'
@@ -20,10 +20,7 @@ const AIDataCenter = lazy(() => import('./components/AIDataCenter'))
 const ControlCenter = lazy(() => import('./components/ControlCenter'))
 const WaterComputePlanner = lazy(() => import('./components/WaterComputePlanner'))
 const VGPUManager = lazy(() => import('./components/VGPUManager'))
-const VMInspector = lazy(() => import('./components/VMInspector'))
 const GraphicsViewer = lazy(() => import('./components/GraphicsViewer'))
-const ComputeComparison = lazy(() => import('./components/ComputeComparison'))
-const Logs = lazy(() => import('./components/Logs'))
 const AIComparisonAgent = lazy(() => import('./components/AIComparisonAgent'))
 const ProjectAIChatbot = lazy(() => import('./components/ProjectAIChatbot'))
 const BoltAccelerator3D = lazy(() => import('./components/BoltAccelerator3D'))
@@ -78,10 +75,7 @@ function App() {
       import('./components/ControlCenter')
       import('./components/WaterComputePlanner')
       import('./components/VGPUManager')
-      import('./components/VMInspector')
       import('./components/GraphicsViewer')
-      import('./components/ComputeComparison')
-      import('./components/Logs')
       import('./components/ProjectAIChatbot')
       import('./components/BoltAccelerator3D')
       import('./components/MonitoringDashboard')
@@ -97,9 +91,9 @@ function App() {
     }
   }, [])
 
-  //  Theme State — default to dark mode
+  //  Theme State — default to light mode
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('vgpu-theme') || 'dark'
+    return localStorage.getItem('vgpu-theme') || 'light'
   })
 
   // Apply theme to root element on mount + change
@@ -129,10 +123,7 @@ function App() {
     { id: 'ai_data_center', name: 'AI Power Supply', icon: Network, component: AIDataCenter },
     { id: 'control_center', name: 'Control Center', icon: Monitor, component: ControlCenter },
     { id: 'water_resource', name: 'Water & Resource', icon: Droplet, component: WaterComputePlanner },
-    { id: 'comparison', name: 'Speed Comparison', icon: GitCompare, component: ComputeComparison },
-    { id: 'vm_inspector', name: 'VM Inspector', icon: Box, component: VMInspector },
     { id: 'graphics', name: 'Graphics Viewer', icon: ImageIcon, component: GraphicsViewer },
-    { id: 'logs', name: 'Logs', icon: FileText, component: Logs },
   ]
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component
