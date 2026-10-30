@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { useSharedMetrics } from '../contexts/MetricsContext'
 import { getCachedDatasets, getCachedScripts } from '../api/cache'
 import { Server, Database, Activity, Play, Terminal, Cpu, Network, Layers, RefreshCw, Send, Square, Check, AlertTriangle, Shield, CheckCircle, Battery, Droplet, Zap, Fuel, Power, Cable, Thermometer, Gauge } from 'lucide-react'
+import SolarEVDataCenter3D from './SolarEVDataCenter3D'
 
-function AIDataCenter({ isActive = true }) {
+function AIDataCenter({ theme = 'light', isActive = true }) {
   const [data, setData] = useState(null)
   const [datasets, setDatasets] = useState([])
   const [scripts, setScripts] = useState([])
@@ -1254,6 +1255,21 @@ function AIDataCenter({ isActive = true }) {
           </div>
         )}
 
+      </div>
+
+      {/* ─── 3D SOLAR PV & EV BACKUP MICROGRID DIGITAL TWIN ─── */}
+      <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+          <div>
+            <span style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 800, letterSpacing: '0.05em' }}>RENEWABLE MICROGRID BACKUP</span>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>On-Site Solar PV & Bidirectional EV Fleet Backup</h3>
+          </div>
+          <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+            Hyperscale Data Center • 12.8 MWp PV Farm • 40 MWh BESS • V2G Emergency Power
+          </div>
+        </div>
+
+        <SolarEVDataCenter3D theme={theme} isActive={isActive} />
       </div>
 
     </div>

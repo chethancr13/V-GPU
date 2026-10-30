@@ -1,12 +1,30 @@
 import { useEffect, useState } from 'react'
 import { useSharedMetrics } from '../contexts/MetricsContext'
 import { Droplet, Cpu, Activity, Zap, Info, Server, Network, Sliders, RefreshCw, BarChart2, ShieldAlert, Layers, Battery, Fuel, Power, Thermometer, Gauge, Bot, Sparkles, CheckCircle2, Calculator } from 'lucide-react'
+import DataCenterCooling3D from './DataCenterCooling3D'
 
-function WaterComputePlanner({ isActive = true }) {
+function WaterComputePlanner({ theme = 'light', isActive = true }) {
   const [data, setData] = useState(null)
 
-  // 3D Visualizer States
-  const [activePipeType, setActivePipeType] = useState('ALL') // 'ALL', 'WATER', 'POWER'
+  // Dynamic reactive theme detection synced with global theme toggle
+  const [isLight, setIsLight] = useState(() => {
+    if (typeof document !== 'undefined') {
+      const docTheme = document.documentElement.getAttribute('data-theme')
+      return docTheme === 'light' || (!docTheme && theme === 'light')
+    }
+    return theme === 'light'
+  })
+
+  useEffect(() => {
+    const updateTheme = () => {
+      const docTheme = document.documentElement.getAttribute('data-theme')
+      setIsLight(docTheme === 'light' || (!docTheme && theme === 'light'))
+    }
+    updateTheme()
+    const observer = new MutationObserver(updateTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    return () => observer.disconnect()
+  }, [theme])
 
   // Model & Estimator States
   const [modelSizeBillion, setModelSizeBillion] = useState(70) // 1B - 175B
@@ -144,211 +162,9 @@ function WaterComputePlanner({ isActive = true }) {
 
   const scalingData = [1, 2, 4, 8, 16, 32, 64].map(nodes => getSpeedupAndEfficiency(nodes))
 
-  // Helper to render a cooling tower
-  const renderCoolingTower = (tx, ty) => {
-    return (
-      <g key={`tower-${tx}-${ty}`}>
-        {/* Base shadow */}
-        <ellipse cx={tx} cy={ty} rx={22} ry={11} fill="black" opacity="0.3" />
-        {/* Tower body */}
-        <path
-          d={`M ${tx - 20} ${ty} 
-              Q ${tx - 15} ${ty - 25} ${tx - 11} ${ty - 45} 
-              L ${tx + 11} ${ty - 45} 
-              Q ${tx + 15} ${ty - 25} ${tx + 20} ${ty} Z`}
-          fill="url(#towerGradient)"
-          stroke="#1b2430"
-          strokeWidth="0.8"
-        />
-        {/* Top Lip */}
-        <ellipse cx={tx} cy={ty - 45} rx={11} ry={5.5} fill="#11161f" stroke="#253243" strokeWidth="0.8" />
-        {/* Bottom air intake slots */}
-        <ellipse cx={tx} cy={ty - 2} rx={19} ry={9.5} fill="none" stroke="#0e131a" strokeWidth="3" strokeDasharray="3,2" />
-        {/* Steam rising particles */}
-        <circle cx={tx - 4} cy={ty - 48} r={4} className="steam-cloud" style={{ animationDelay: '0s' }} />
-        <circle cx={tx + 4} cy={ty - 52} r={5} className="steam-cloud" style={{ animationDelay: '1.2s' }} />
-        <circle cx={tx} cy={ty - 55} r={3} className="steam-cloud" style={{ animationDelay: '2.5s' }} />
-      </g>
-    )
-  }
-
-  // Helper to render a storage tank
-  const renderStorageTank = (tx, ty) => {
-    return (
-      <g key={`tank-${tx}-${ty}`}>
-        {/* Tank Shadow */}
-        <ellipse cx={tx} cy={ty} rx={14} ry={7} fill="black" opacity="0.3" />
-        {/* Cylindrical body */}
-        <path
-          d={`M ${tx - 12} ${ty} 
-              L ${tx - 12} ${ty - 30} 
-              A 12 6 0 0 1 ${tx + 12} ${ty - 30} 
-              L ${tx + 12} ${ty} Z`}
-          fill="url(#tankGradient)"
-          stroke="#1d2633"
-          strokeWidth="0.8"
-        />
-        {/* Top Dome */}
-        <path
-          d={`M ${tx - 12} ${ty - 30} 
-              A 12 10 0 0 1 ${tx + 12} ${ty - 30} Z`}
-          fill="#314052"
-          stroke="#1d2633"
-          strokeWidth="0.8"
-        />
-      </g>
-    )
-  }
-
-  // Helper to render a server rack
-  const renderServerRack = (rx, ry, id) => {
-    const h = 32; // height
-    const w = 10; // width along left-down axis
-    const d = 16; // depth along right-down axis
-    
-    // Top face corners
-    const t1 = { x: rx, y: ry - h }
-    const t2 = { x: rx - w, y: ry - h + w*0.5 }
-    const t3 = { x: rx - w + d, y: ry - h + w*0.5 + d*0.5 }
-    const t4 = { x: rx + d, y: ry - h + d*0.5 }
-    
-    // Bottom face corners
-    const b2 = { x: rx - w, y: ry + w*0.5 }
-    const b3 = { x: rx - w + d, y: ry + w*0.5 + d*0.5 }
-    const b4 = { x: rx + d, y: ry + d*0.5 }
-    
-    return (
-      <g key={`rack-${id}`}>
-        <polygon points={`${rx},${ry} ${rx-w},${ry+w*0.5} ${rx-w+d},${ry+w*0.5+d*0.5} ${rx+d},${ry+d*0.5}`} fill="black" opacity="0.35" />
-        <polygon points={`${t2.x},${t2.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b2.x},${b2.y}`} fill="#161f28" stroke="#253545" strokeWidth="0.5" />
-        <polygon points={`${t4.x},${t4.y} ${t3.x},${t3.y} ${b3.x},${b3.y} ${b4.x},${b4.y}`} fill="#0f1620" stroke="#253545" strokeWidth="0.5" />
-        <polygon points={`${t1.x},${t1.y} ${t2.x},${t2.y} ${t3.x},${t3.y} ${t4.x},${t4.y}`} fill="#253344" stroke="#374b63" strokeWidth="0.5" />
-        
-        {Array.from({ length: 6 }).map((_, idx) => {
-          const ly = t4.y + (idx + 1) * (h / 7);
-          const lx1 = t4.x - (t4.x - t3.x) * 0.2;
-          const ly1 = t4.y + (idx + 1) * (h / 7) + (t3.y - t4.y) * 0.2;
-          const lx2 = t4.x - (t4.x - t3.x) * 0.8;
-          const ly2 = t4.y + (idx + 1) * (h / 7) + (t3.y - t4.y) * 0.8;
-          const ledColor = idx % 2 === 0 ? '#00f2fe' : '#09f';
-          return (
-            <line
-              key={idx}
-              x1={lx1}
-              y1={ly - idx * 0.5 + 2}
-              x2={lx2}
-              y2={ly - idx * 0.5 + 4}
-              stroke={ledColor}
-              strokeWidth="1.2"
-              opacity="0.85"
-              filter="url(#glow)"
-            />
-          )
-        })}
-      </g>
-    )
-  }
-
-  // Helper to render a clarifying tank
-  const renderClarifierTank = (cx, cy, id) => {
-    return (
-      <g key={`clarifier-${id}`}>
-        <ellipse cx={cx} cy={cy + 4} rx={32} ry={16} fill="black" opacity="0.3" />
-        <path
-          d={`M ${cx - 30} ${cy} 
-              L ${cx - 30} ${cy + 8} 
-              A 30 15 0 0 0 ${cx + 30} ${cy + 8} 
-              L ${cx + 30} ${cy} Z`}
-          fill="#2c3540"
-          stroke="#1d2633"
-          strokeWidth="0.8"
-        />
-        <ellipse cx={cx} cy={cy} rx={30} ry={15} fill="#1f2730" stroke="#3b4856" strokeWidth="1" />
-        <ellipse cx={cx} cy={cy} rx={27} ry={13.5} fill="#14a3b8" opacity="0.75" />
-        <ellipse cx={cx} cy={cy} rx={22} ry={11} fill="none" stroke="#22d3ee" strokeWidth="0.5" opacity="0.5" />
-        <ellipse cx={cx} cy={cy} rx={4} ry={2} fill="#718096" stroke="#4a5568" strokeWidth="0.5" />
-        <path d={`M ${cx - 1} ${cy} L ${cx - 1} ${cy - 4} A 1 0.5 0 0 1 ${cx + 1} ${cy - 4} L ${cx + 1} ${cy} Z`} fill="#718096" />
-        <g transform={`translate(${cx}, ${cy}) scale(1, 0.5)`}>
-          <line
-            x1="0"
-            y1="0"
-            x2="27"
-            y2="0"
-            stroke="#e2e8f0"
-            strokeWidth="1.5"
-            className="scraper-bridge"
-            style={{ filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.5))' }}
-          />
-        </g>
-      </g>
-    )
-  }
-
   return (
     <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', background: 'var(--black)', minHeight: '100%', color: 'var(--text-primary)' }}>
       
-      {/* Styles for animated flow pipelines */}
-      <style>{`
-        @keyframes steam-rise {
-          0% {
-            transform: translateY(0) scale(0.6);
-            opacity: 0;
-          }
-          20% {
-            opacity: 0.45;
-          }
-          100% {
-            transform: translateY(-35px) scale(1.3);
-            opacity: 0;
-          }
-        }
-        @keyframes rotate-scraper {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes flow-dots {
-          to {
-            stroke-dashoffset: -40;
-          }
-        }
-        .steam-cloud {
-          animation: steam-rise 3.5s ease-out infinite;
-          fill: rgba(224, 242, 254, 0.45);
-          filter: blur(1.5px);
-        }
-        .scraper-bridge {
-          animation: rotate-scraper 24s linear infinite;
-          transform-origin: 0px 0px;
-        }
-        .flow-line {
-          stroke-dasharray: 6, 4;
-          animation: flow-dots 2s linear infinite;
-        }
-        .flow-line-fast {
-          stroke-dasharray: 5, 3;
-          animation: flow-dots 1.2s linear infinite;
-        }
-        .flow-line-reverse {
-          stroke-dasharray: 6, 4;
-          animation: flow-dots 2s linear infinite;
-          animation-direction: reverse;
-        }
-        .flow-btn-active {
-          background: rgba(6, 182, 212, 0.25);
-          border: 1px solid #06b6d4;
-          color: #00f2fe;
-        }
-        .flow-btn-inactive {
-          background: #111820;
-          border: 1px solid rgba(255,255,255,0.08);
-          color: #8b949e;
-        }
-        .flow-btn-inactive:hover {
-          color: #fff;
-          border-color: rgba(255,255,255,0.2);
-        }
-      `}</style>
-
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.75rem' }}>
         <div>
@@ -358,7 +174,21 @@ function WaterComputePlanner({ isActive = true }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <button 
             onClick={() => setWueOptimized(!wueOptimized)}
-            style={{ padding: '0.35rem 0.75rem', background: wueOptimized ? 'rgba(6, 182, 212, 0.2)' : 'var(--gray)', border: wueOptimized ? '1px solid #06b6d4' : '1px solid var(--border)', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', color: wueOptimized ? '#06b6d4' : '#fff' }}
+            style={{
+              padding: '0.35rem 0.75rem',
+              background: wueOptimized
+                ? (isLight ? '#cffafe' : 'rgba(6, 182, 212, 0.2)')
+                : (isLight ? '#ffffff' : 'var(--gray)'),
+              border: wueOptimized
+                ? '1px solid #06b6d4'
+                : (isLight ? '1px solid #cbd5e1' : '1px solid var(--border)'),
+              borderRadius: '4px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              color: wueOptimized ? (isLight ? '#0891b2' : '#06b6d4') : (isLight ? '#334155' : '#fff'),
+              boxShadow: isLight ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+            }}
           >
             WUE BOOST: {wueOptimized ? 'OPTIMIZED' : 'STANDARD'}
           </button>
@@ -368,254 +198,14 @@ function WaterComputePlanner({ isActive = true }) {
       {/* Layout Split: Left 3D Loop visualizer, Right Water Stats cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '7fr 4fr', gap: '1.5rem' }}>
         
-        {/* 3D Visualizer Room */}
-        <div 
-          style={{ 
-            position: 'relative', 
-            height: '380px', 
-            background: '#0e141a', 
-            border: '1px solid rgba(255,255,255,0.08)', 
-            borderRadius: '8px', 
-            overflow: 'hidden',
-            userSelect: 'none'
-          }}
-        >
-          {/* Sustainability Pill Badge */}
-          <div style={{ position: 'absolute', top: '1rem', left: '1.25rem', background: '#fff', color: '#07121b', padding: '0.25rem 0.75rem', borderRadius: '15px', fontSize: '0.55rem', fontWeight: 900, letterSpacing: '0.08em', zIndex: 10 }}>
-            SUSTAINABILITY
-          </div>
-
-          {/* Overlay Filter Buttons */}
-          <div style={{ position: 'absolute', top: '1rem', right: '1.25rem', display: 'flex', gap: '0.4rem', zIndex: 10 }}>
-            {['ALL', 'WATER', 'POWER'].map(t => (
-              <button 
-                key={t}
-                onClick={() => setActivePipeType(t)}
-                style={{ padding: '0.3rem 0.65rem', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.15s' }}
-                className={activePipeType === t ? 'flow-btn-active' : 'flow-btn-inactive'}
-              >
-                {t} FLOWS
-              </button>
-            ))}
-          </div>
-
-          <svg style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} viewBox="0 0 850 500">
-            <defs>
-              <filter id="shadow-blur" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="8" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
-              <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="3" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-
-              <linearGradient id="towerGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#2c3746" />
-                <stop offset="35%" stopColor="#45546b" />
-                <stop offset="75%" stopColor="#2c3746" />
-                <stop offset="100%" stopColor="#1a222c" />
-              </linearGradient>
-
-              <linearGradient id="tankGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#1b323c" />
-                <stop offset="40%" stopColor="#2c5364" />
-                <stop offset="80%" stopColor="#1b323c" />
-                <stop offset="100%" stopColor="#0f2027" />
-              </linearGradient>
-
-              <marker id="arrow-cyan" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#00f2fe" />
-              </marker>
-              <marker id="arrow-yellow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#eab308" />
-              </marker>
-              <marker id="arrow-pink" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#f43f5e" />
-              </marker>
-              <marker id="arrow-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#3b82f6" />
-              </marker>
-              <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#10b981" />
-              </marker>
-            </defs>
-
-            <g style={{
-              transform: 'translate(-30px, -26px) scale(0.85)'
-            }}>
-              {/* FLOW PIPELINES / LINKS */}
-              {/* 1. Water Treatment -> Power Plant (Cyan - Dotted) */}
-              {(activePipeType === 'ALL' || activePipeType === 'WATER') && (
-                <path
-                  d="M 640 210 L 510 145 L 430 185"
-                  fill="none"
-                  stroke="#00f2fe"
-                  strokeWidth="2.5"
-                  className="flow-line"
-                  markerEnd="url(#arrow-cyan)"
-                  filter="url(#glow)"
-                />
-              )}
-
-              {/* 2. Water Treatment -> Datacenter (Cyan - Dotted Double Lines) */}
-              {(activePipeType === 'ALL' || activePipeType === 'WATER') && (
-                <>
-                  <path
-                    d="M 650 230 L 590 195 L 530 225 L 530 280 L 570 300 L 590 320"
-                    fill="none"
-                    stroke="#00f2fe"
-                    strokeWidth="2"
-                    className="flow-line"
-                    markerEnd="url(#arrow-cyan)"
-                    filter="url(#glow)"
-                  />
-                  <path
-                    d="M 660 240 L 610 215 L 545 247 L 545 292 L 580 310 L 598 328"
-                    fill="none"
-                    stroke="#00f2fe"
-                    strokeWidth="2"
-                    className="flow-line-fast"
-                    markerEnd="url(#arrow-cyan)"
-                    filter="url(#glow)"
-                  />
-                </>
-              )}
-
-              {/* 3. Power Plant -> Wastewater Treatment (Pink/Red - Dotted) */}
-              {(activePipeType === 'ALL' || activePipeType === 'WATER') && (
-                <path
-                  d="M 320 195 L 260 225 L 340 345 L 390 370 L 390 410"
-                  fill="none"
-                  stroke="#f43f5e"
-                  strokeWidth="2.5"
-                  className="flow-line-reverse"
-                  markerEnd="url(#arrow-pink)"
-                  filter="url(#glow)"
-                />
-              )}
-
-              {/* 4. Power Plant -> Datacenter (Yellow - Electric Power) */}
-              {(activePipeType === 'ALL' || activePipeType === 'POWER') && (
-                <path
-                  d="M 420 210 L 520 260 L 560 280 L 560 315"
-                  fill="none"
-                  stroke="#eab308"
-                  strokeWidth="2.5"
-                  className="flow-line-fast"
-                  markerEnd="url(#arrow-yellow)"
-                  filter="url(#glow)"
-                />
-              )}
-
-              {/* 5. Datacenter -> Wastewater (Blue/Grey - Blowdown) */}
-              {(activePipeType === 'ALL' || activePipeType === 'WATER') && (
-                <path
-                  d="M 530 380 L 460 415"
-                  fill="none"
-                  stroke="#3b82f6"
-                  strokeWidth="2.5"
-                  className="flow-line"
-                  markerEnd="url(#arrow-blue)"
-                  filter="url(#glow)"
-                />
-              )}
-
-              {/* 6. Wastewater -> Datacenter (Green - Reclaimed/Recycled Water) */}
-              {(activePipeType === 'ALL' || activePipeType === 'WATER') && (
-                <path
-                  d="M 490 435 L 550 405"
-                  fill="none"
-                  stroke="#10b981"
-                  strokeWidth="2.5"
-                  className="flow-line-reverse"
-                  markerEnd="url(#arrow-green)"
-                  filter="url(#glow)"
-                />
-              )}
-
-              {/* ================= PLATFORMS & COMPONENTS ================= */}
-
-              {/* --- Wastewater Treatment Plant Platform --- */}
-              <g>
-                {/* Shadow */}
-                <ellipse cx="440" cy="460" rx="110" ry="60" fill="black" opacity="0.4" filter="url(#shadow-blur)" />
-                {/* 3D Slab */}
-                <polygon points="440,390  550,450  440,510  330,450" fill="#1b242f" stroke="#2b3b4d" strokeWidth="1" />
-                <polygon points="330,450  440,510  440,518  330,458" fill="#11171f" stroke="#2b3b4d" strokeWidth="1" />
-                <polygon points="550,450  440,510  440,518  550,458" fill="#0c1016" stroke="#2b3b4d" strokeWidth="1" />
-                {/* Contents */}
-                {renderClarifierTank(405, 435, 1)}
-                {renderClarifierTank(465, 465, 2)}
-                {/* Platform Label */}
-                <text x="440" y="524" textAnchor="middle" fill="#8b949e" fontSize="9px" fontWeight="700" letterSpacing="0.05em">WASTEWATER TREATMENT PLANT</text>
-              </g>
-
-              {/* --- Datacenter Platform --- */}
-              <g>
-                {/* Shadow */}
-                <ellipse cx="600" cy="370" rx="110" ry="60" fill="black" opacity="0.4" filter="url(#shadow-blur)" />
-                {/* 3D Slab */}
-                <polygon points="600,300  710,360  600,420  490,360" fill="#1b242f" stroke="#2b3b4d" strokeWidth="1" />
-                <polygon points="490,360  600,420  600,428  490,368" fill="#11171f" stroke="#2b3b4d" strokeWidth="1" />
-                <polygon points="710,360  600,420  600,428  710,368" fill="#0c1016" stroke="#2b3b4d" strokeWidth="1" />
-                {/* Contents - Server Racks */}
-                {/* Row 2 (back) */}
-                {renderServerRack(580, 325, 4)}
-                {renderServerRack(600, 335, 5)}
-                {renderServerRack(620, 345, 6)}
-                {/* Row 1 (front) */}
-                {renderServerRack(550, 340, 1)}
-                {renderServerRack(570, 350, 2)}
-                {renderServerRack(590, 360, 3)}
-                {/* Platform Label */}
-                <text x="600" y="434" textAnchor="middle" fill="#8b949e" fontSize="9px" fontWeight="700" letterSpacing="0.05em">DATACENTER</text>
-              </g>
-
-              {/* --- Water Treatment Plant Platform --- */}
-              <g>
-                {/* Shadow */}
-                <ellipse cx="700" cy="230" rx="100" ry="55" fill="black" opacity="0.4" filter="url(#shadow-blur)" />
-                {/* 3D Slab */}
-                <polygon points="700,165  800,220  700,275  600,220" fill="#1b242f" stroke="#2b3b4d" strokeWidth="1" />
-                <polygon points="600,220  700,275  700,283  600,228" fill="#11171f" stroke="#2b3b4d" strokeWidth="1" />
-                <polygon points="800,220  700,275  700,283  800,228" fill="#0c1016" stroke="#2b3b4d" strokeWidth="1" />
-                {/* Contents */}
-                {renderStorageTank(660, 205)}
-                {/* Pump/Machinery Boxes */}
-                <polygon points="710,210  740,195  725,187  695,202" fill="#06b6d4" opacity="0.8" stroke="#0891b2" strokeWidth="0.5" />
-                <polygon points="695,202  725,187  725,193  695,208" fill="#0891b2" stroke="#0891b2" strokeWidth="0.5" />
-                <polygon points="710,210  725,187  725,193  710,216" fill="#0e131a" stroke="#0891b2" strokeWidth="0.5" />
-
-                <polygon points="730,225  760,210  745,202  715,217" fill="#22d3ee" opacity="0.85" stroke="#0891b2" strokeWidth="0.5" />
-                <polygon points="715,217  745,202  745,208  715,223" fill="#0891b2" stroke="#0891b2" strokeWidth="0.5" />
-                <polygon points="730,225  745,202  745,208  730,231" fill="#0e131a" stroke="#0891b2" strokeWidth="0.5" />
-                {/* Piping details */}
-                <path d="M 672 205 L 705 220" fill="none" stroke="#22d3ee" strokeWidth="2.5" />
-                {/* Platform Label */}
-                <text x="700" y="289" textAnchor="middle" fill="#8b949e" fontSize="9px" fontWeight="700" letterSpacing="0.05em">WATER TREATMENT PLANT</text>
-              </g>
-
-              {/* --- Power Plant Platform --- */}
-              <g>
-                {/* Shadow */}
-                <ellipse cx="370" cy="190" rx="100" ry="55" fill="black" opacity="0.4" filter="url(#shadow-blur)" />
-                {/* 3D Slab */}
-                <polygon points="370,125  470,180  370,235  270,180" fill="#1b242f" stroke="#2b3b4d" strokeWidth="1" />
-                <polygon points="270,180  370,235  370,243  270,188" fill="#11171f" stroke="#2b3b4d" strokeWidth="1" />
-                <polygon points="470,180  370,235  370,243  470,188" fill="#0c1016" stroke="#2b3b4d" strokeWidth="1" />
-                {/* Contents */}
-                {renderCoolingTower(335, 175)}
-                {renderCoolingTower(385, 200)}
-                {/* Platform Label */}
-                <text x="370" y="249" textAnchor="middle" fill="#8b949e" fontSize="9px" fontWeight="700" letterSpacing="0.05em">POWER PLANT</text>
-              </g>
-            </g>
-          </svg>
-        </div>
+        {/* 3D Digital Twin Visualizer Room (Matches Physical Data Center Blueprint) */}
+        <DataCenterCooling3D
+          waterConsumption={waterConsumptionLPerHour}
+          wue={currentWUE}
+          totalPowerKW={totalPowerKW}
+          isActive={isActive}
+          theme={isLight ? 'light' : 'dark'}
+        />
 
         {/* Real-time Environmental Telemetry */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -690,7 +280,13 @@ function WaterComputePlanner({ isActive = true }) {
             Fuel: {powerTel.genFuel.toFixed(0)}% | Output: {powerTel.genOutput.toFixed(0)} kW
           </div>
           <button onClick={() => setGenActive(!genActive)}
-            style={{ marginTop: '0.4rem', padding: '3px 10px', borderRadius: '3px', fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer', background: genActive ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.1)', border: `1px solid ${genActive ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.2)'}`, color: genActive ? '#ef4444' : '#22c55e', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            style={{
+              marginTop: '0.4rem', padding: '3px 10px', borderRadius: '3px', fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer',
+              background: genActive ? (isLight ? '#fee2e2' : 'rgba(239,68,68,0.15)') : (isLight ? '#dcfce7' : 'rgba(34,197,94,0.1)'),
+              border: `1px solid ${genActive ? (isLight ? '#f87171' : 'rgba(239,68,68,0.3)') : (isLight ? '#86efac' : 'rgba(34,197,94,0.2)')}`,
+              color: genActive ? (isLight ? '#dc2626' : '#ef4444') : (isLight ? '#16a34a' : '#22c55e'),
+              display: 'flex', alignItems: 'center', gap: '4px'
+            }}>
             {genActive ? 'DEACTIVATE' : 'ACTIVATE'}
           </button>
         </div>
@@ -705,7 +301,13 @@ function WaterComputePlanner({ isActive = true }) {
             Temp: {powerTel.batteryTemp.toFixed(1)}°C | {batteryCharging ? 'CHARGING' : 'DISCHARGING'} | 2.4 MWh LFP
           </div>
           <button onClick={() => setBatteryCharging(!batteryCharging)}
-            style={{ marginTop: '0.4rem', padding: '3px 10px', borderRadius: '3px', fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer', background: batteryCharging ? 'rgba(6,182,212,0.1)' : 'rgba(249,115,22,0.1)', border: `1px solid ${batteryCharging ? 'rgba(6,182,212,0.3)' : 'rgba(249,115,22,0.3)'}`, color: batteryCharging ? '#22d3ee' : '#f97316', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            style={{
+              marginTop: '0.4rem', padding: '3px 10px', borderRadius: '3px', fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer',
+              background: batteryCharging ? (isLight ? '#cffafe' : 'rgba(6,182,212,0.1)') : (isLight ? '#ffedd5' : 'rgba(249,115,22,0.1)'),
+              border: `1px solid ${batteryCharging ? (isLight ? '#67e8f9' : 'rgba(6,182,212,0.3)') : (isLight ? '#fdba74' : 'rgba(249,115,22,0.3)')}`,
+              color: batteryCharging ? (isLight ? '#0891b2' : '#22d3ee') : (isLight ? '#c2410c' : '#f97316'),
+              display: 'flex', alignItems: 'center', gap: '4px'
+            }}>
             {batteryCharging ? 'DISCHARGE' : 'CHARGE'}
           </button>
         </div>
@@ -887,40 +489,41 @@ function WaterComputePlanner({ isActive = true }) {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             {/* Tab switchers */}
-            <div style={{ display: 'flex', background: '#0e141a', padding: '3px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <button
-                onClick={() => setActiveFormulaTab('cooling')}
-                style={{
-                  padding: '4px 10px', borderRadius: '4px', border: 'none',
-                  background: activeFormulaTab === 'cooling' ? '#76B900' : 'transparent',
-                  color: activeFormulaTab === 'cooling' ? '#000' : '#8b949e',
-                  fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s'
-                }}
-              >
-                🌊 Cooling Formulas
-              </button>
-              <button
-                onClick={() => setActiveFormulaTab('training')}
-                style={{
-                  padding: '4px 10px', borderRadius: '4px', border: 'none',
-                  background: activeFormulaTab === 'training' ? '#76B900' : 'transparent',
-                  color: activeFormulaTab === 'training' ? '#000' : '#8b949e',
-                  fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s'
-                }}
-              >
-                ⚡ 6·N·D Scaling Law
-              </button>
-              <button
-                onClick={() => setActiveFormulaTab('proof')}
-                style={{
-                  padding: '4px 10px', borderRadius: '4px', border: 'none',
-                  background: activeFormulaTab === 'proof' ? '#76B900' : 'transparent',
-                  color: activeFormulaTab === 'proof' ? '#000' : '#8b949e',
-                  fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s'
-                }}
-              >
-                📝 AI Derivation Proof
-              </button>
+            <div style={{
+              display: 'flex',
+              background: isLight ? '#f1f5f9' : '#0e141a',
+              padding: '3px',
+              borderRadius: '6px',
+              border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.06)'
+            }}>
+              {[
+                { id: 'cooling', label: '🌊 Cooling Formulas' },
+                { id: 'training', label: '⚡ 6·N·D Scaling Law' },
+                { id: 'proof', label: '📝 AI Derivation Proof' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveFormulaTab(tab.id)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    background: activeFormulaTab === tab.id
+                      ? (isLight ? '#5a9100' : '#76B900')
+                      : 'transparent',
+                    color: activeFormulaTab === tab.id
+                      ? '#ffffff'
+                      : (isLight ? '#475569' : '#8b949e'),
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    boxShadow: activeFormulaTab === tab.id && isLight ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
             <button
@@ -928,10 +531,17 @@ function WaterComputePlanner({ isActive = true }) {
               disabled={aiComputing}
               style={{
                 display: 'flex', alignItems: 'center', gap: '0.35rem',
-                background: aiComputing ? 'rgba(118, 185, 0, 0.2)' : '#76B900',
-                border: 'none', color: '#000',
-                padding: '5px 12px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800,
-                cursor: aiComputing ? 'not-allowed' : 'pointer'
+                background: aiComputing
+                  ? (isLight ? 'rgba(90, 145, 0, 0.2)' : 'rgba(118, 185, 0, 0.2)')
+                  : (isLight ? '#5a9100' : '#76B900'),
+                border: 'none',
+                color: '#ffffff',
+                padding: '5px 12px',
+                borderRadius: '6px',
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                cursor: aiComputing ? 'not-allowed' : 'pointer',
+                boxShadow: isLight ? '0 1px 3px rgba(90, 145, 0, 0.3)' : 'none'
               }}
             >
               <RefreshCw size={12} className={aiComputing ? 'spin' : ''} />
