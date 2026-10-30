@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import {
   Cpu, Layers, Zap, Flame, Box, RotateCcw,
   Sparkles, Image as ImageIcon, Radio, ShieldCheck,
-  Grid, Compass, Maximize2
+  Compass, Maximize2
 } from 'lucide-react'
 
 // ─── HARDWARE SPECIFICATIONS ───
@@ -109,16 +109,16 @@ function PcbSubstrate({ exploded = 0, viewMode, selectedPart, onSelect }) {
     canvas.height = 1024
     const ctx = canvas.getContext('2d')
 
-    // Matte dark black PCB base matching photo
-    ctx.fillStyle = '#101216'
+    // Clean premium white / light-grey PCB substrate base
+    ctx.fillStyle = '#f5f6f8'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // Subtle dark copper ground planes
-    ctx.fillStyle = '#171920'
+    // Subtle brushed light metallic grey ground planes
+    ctx.fillStyle = '#e5e7eb'
     ctx.fillRect(40, 40, canvas.width - 80, canvas.height - 80)
 
-    // Warm copper / gold circuit trace fan-outs
-    ctx.strokeStyle = '#28241e'
+    // Silver / slate-grey circuit trace fan-outs
+    ctx.strokeStyle = '#cbd5e1'
     ctx.lineWidth = 1.6
 
     // Fan-out traces radiating from central ASIC towards VRM and memory
@@ -131,7 +131,7 @@ function PcbSubstrate({ exploded = 0, viewMode, selectedPart, onSelect }) {
     }
 
     // High-speed differential pair buses to PCIe connector
-    ctx.strokeStyle = '#322d24'
+    ctx.strokeStyle = '#94a3b8'
     ctx.lineWidth = 2.0
     for (let x = 300; x <= 1400; x += 22) {
       ctx.beginPath()
@@ -161,8 +161,8 @@ function PcbSubstrate({ exploded = 0, viewMode, selectedPart, onSelect }) {
       }
     }
 
-    // Laser silkscreen text and reference designators
-    ctx.fillStyle = '#788190'
+    // Laser silkscreen text and reference designators in sharp slate/charcoal
+    ctx.fillStyle = '#334155'
     ctx.font = 'bold 16px "SF Mono", monospace'
     ctx.fillText('BOLT-1420 TENSOR ACCELERATOR', 280, 100)
     ctx.fillText('96GB HBM3e // PCIe Gen5 x16', 280, 126)
@@ -189,9 +189,9 @@ function PcbSubstrate({ exploded = 0, viewMode, selectedPart, onSelect }) {
         <boxGeometry args={[15, 0.16, 6.4]} />
         <meshStandardMaterial
           map={pcbTexture}
-          color={viewMode === 'wireframe' ? '#3b82f6' : isSelected ? '#1e293b' : '#14161b'}
-          metalness={0.45}
-          roughness={0.6}
+          color={viewMode === 'wireframe' ? '#3b82f6' : isSelected ? '#bfdbfe' : '#ffffff'}
+          metalness={0.18}
+          roughness={0.52}
           wireframe={viewMode === 'wireframe'}
         />
       </mesh>
@@ -589,27 +589,35 @@ function FrontIOAndHeatsinks({ exploded = 0, viewMode, selectedPart, onSelect })
   const isSelected = selectedPart === 'io_heatsinks'
   const yOffset = exploded * 2.4
 
-  // Smooth realistic curved twinax cables arching up and to the left
+  // Smooth realistic curved twinax cables connected continuously directly to GPU transceivers
   const [cableGeometry1, cableGeometry2] = useMemo(() => {
+    // Cable 1: plugs directly into GPU transceiver cage 1 (z = -1.6) and flows outward without cuts
     const p1 = [
-      new THREE.Vector3(-6.4, 0.42, -1.6),
-      new THREE.Vector3(-7.4, 0.55, -1.9),
-      new THREE.Vector3(-8.8, 0.95, -2.5),
-      new THREE.Vector3(-10.2, 1.6, -3.1),
-      new THREE.Vector3(-11.5, 2.4, -3.5)
+      new THREE.Vector3(-2.1, 0.39, -1.6),
+      new THREE.Vector3(-3.0, 0.40, -1.62),
+      new THREE.Vector3(-4.2, 0.45, -1.70),
+      new THREE.Vector3(-5.8, 0.60, -1.90),
+      new THREE.Vector3(-7.6, 0.95, -2.30),
+      new THREE.Vector3(-9.6, 1.55, -2.85),
+      new THREE.Vector3(-11.6, 2.30, -3.45),
+      new THREE.Vector3(-13.5, 3.10, -4.00)
     ]
+    // Cable 2: plugs directly into GPU transceiver cage 2 (z = -0.65) and flows alongside Cable 1
     const p2 = [
-      new THREE.Vector3(-6.4, 0.42, -0.65),
-      new THREE.Vector3(-7.6, 0.55, -0.85),
-      new THREE.Vector3(-9.0, 1.05, -1.3),
-      new THREE.Vector3(-10.4, 1.8, -1.9),
-      new THREE.Vector3(-11.8, 2.7, -2.3)
+      new THREE.Vector3(-2.1, 0.39, -0.65),
+      new THREE.Vector3(-3.0, 0.40, -0.67),
+      new THREE.Vector3(-4.2, 0.45, -0.74),
+      new THREE.Vector3(-5.8, 0.62, -0.92),
+      new THREE.Vector3(-7.6, 1.02, -1.30),
+      new THREE.Vector3(-9.6, 1.68, -1.82),
+      new THREE.Vector3(-11.6, 2.48, -2.40),
+      new THREE.Vector3(-13.5, 3.32, -2.90)
     ]
     const curve1 = new THREE.CatmullRomCurve3(p1)
     const curve2 = new THREE.CatmullRomCurve3(p2)
     return [
-      new THREE.TubeGeometry(curve1, 48, 0.18, 16, false),
-      new THREE.TubeGeometry(curve2, 48, 0.18, 16, false)
+      new THREE.TubeGeometry(curve1, 64, 0.17, 16, false),
+      new THREE.TubeGeometry(curve2, 64, 0.17, 16, false)
     ]
   }, [])
 
@@ -660,10 +668,15 @@ function FrontIOAndHeatsinks({ exploded = 0, viewMode, selectedPart, onSelect })
             <boxGeometry args={[0.7, 0.42, 0.58]} />
             <meshStandardMaterial color={isSelected ? '#0284c7' : '#333842'} metalness={0.85} roughness={0.25} />
           </mesh>
+          {/* Molded Cable Strain Relief Boot Collar */}
+          <mesh position={[-1.25, 0.05, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.22, 0.25, 0.22, 16]} />
+            <meshStandardMaterial color="#1a1c22" roughness={0.7} />
+          </mesh>
           {/* Black Pull-Tab Latch Mechanism */}
-          <mesh position={[-1.28, 0.15, 0]}>
-            <boxGeometry args={[0.26, 0.1, 0.32]} />
-            <meshStandardMaterial color="#0d1015" roughness={0.7} />
+          <mesh position={[-1.22, 0.22, 0]}>
+            <boxGeometry args={[0.22, 0.08, 0.30]} />
+            <meshStandardMaterial color="#0284c7" roughness={0.5} />
           </mesh>
         </group>
       ))}
@@ -674,13 +687,31 @@ function FrontIOAndHeatsinks({ exploded = 0, viewMode, selectedPart, onSelect })
         <meshStandardMaterial color="#d1d5db" metalness={0.88} roughness={0.2} />
       </mesh>
 
-      {/* Twinaxial DAC Cables */}
+      {/* Twinaxial DAC Cables - Continuous from GPU Transceivers */}
       <mesh geometry={cableGeometry1}>
-        <meshStandardMaterial color="#1a1d24" roughness={0.5} wireframe={viewMode === 'wireframe'} />
+        <meshStandardMaterial
+          color={viewMode === 'wireframe' ? '#3b82f6' : isSelected ? '#38bdf8' : '#14171e'}
+          metalness={0.35}
+          roughness={0.45}
+          wireframe={viewMode === 'wireframe'}
+        />
       </mesh>
       <mesh geometry={cableGeometry2}>
-        <meshStandardMaterial color="#1a1d24" roughness={0.5} wireframe={viewMode === 'wireframe'} />
+        <meshStandardMaterial
+          color={viewMode === 'wireframe' ? '#3b82f6' : isSelected ? '#38bdf8' : '#14171e'}
+          metalness={0.35}
+          roughness={0.45}
+          wireframe={viewMode === 'wireframe'}
+        />
       </mesh>
+
+      {/* Cable organizer clip tying dual DAC cables neatly together */}
+      <group position={[-4.8, 0.52, -1.35]} rotation={[0, 0.2, 0.15]}>
+        <mesh>
+          <boxGeometry args={[0.25, 0.38, 1.3]} />
+          <meshStandardMaterial color="#0284c7" metalness={0.8} roughness={0.3} />
+        </mesh>
+      </group>
     </group>
   )
 }
@@ -854,7 +885,6 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
   const [isExploding, setIsExploding] = useState(false)
   const [autoRotate, setAutoRotate] = useState(false) // Default false so it aligns with the photo first!
   const [viewMode, setViewMode] = useState('normal') // 'normal' | 'thermal' | 'wireframe'
-  const [bgStyle, setBgStyle] = useState('grid') // 'grid' | 'studio'
   const [activeSignalFlow, setActiveSignalFlow] = useState(true)
   const [selectedPart, setSelectedPart] = useState('asic')
   const [showPhotoComparison, setShowPhotoComparison] = useState(false)
@@ -945,25 +975,10 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
         height: '100%',
         width: '100%',
         position: 'relative',
-        backgroundColor: isLight
-          ? (bgStyle === 'grid' ? '#f1f5f9' : '#e2e8f0')
-          : (bgStyle === 'grid' ? '#070b14' : '#030406'),
+        backgroundColor: isLight ? '#f1f5f9' : '#030508',
         backgroundImage: isLight
-          ? (bgStyle === 'grid' ? `
-              linear-gradient(rgba(14, 165, 233, 0.12) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(14, 165, 233, 0.12) 1px, transparent 1px),
-              linear-gradient(rgba(14, 165, 233, 0.04) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(14, 165, 233, 0.04) 1px, transparent 1px),
-              radial-gradient(ellipse 70% 60% at 50% 50%, rgba(255, 255, 255, 0.95) 0%, rgba(226, 232, 240, 0.85) 100%)
-            ` : 'radial-gradient(circle at center, #ffffff 0%, #cbd5e1 100%)')
-          : (bgStyle === 'grid' ? `
-              linear-gradient(rgba(56, 189, 248, 0.08) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(56, 189, 248, 0.08) 1px, transparent 1px),
-              linear-gradient(rgba(56, 189, 248, 0.02) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(56, 189, 248, 0.02) 1px, transparent 1px),
-              radial-gradient(ellipse 65% 55% at 50% 50%, rgba(14, 165, 233, 0.14) 0%, transparent 80%)
-            ` : 'radial-gradient(circle at center, #11141c 0%, #000000 100%)'),
-        backgroundSize: bgStyle === 'grid' ? '100px 100px, 100px 100px, 20px 20px, 20px 20px, 100% 100%' : '100% 100%',
+          ? 'radial-gradient(ellipse 75% 65% at 50% 50%, rgba(255, 255, 255, 0.98) 0%, rgba(226, 232, 240, 0.9) 100%)'
+          : 'radial-gradient(ellipse 70% 60% at 50% 50%, rgba(14, 165, 233, 0.08) 0%, #030508 100%)',
         overflow: 'hidden',
         color: isLight ? '#0f172a' : '#f8fafc',
         fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
@@ -1019,14 +1034,6 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
             maxDistance={32}
             maxPolarAngle={Math.PI / 2 + 0.15}
           />
-
-          {/* 3D Perspective CAD Floor Grid (visible when grid background is active) */}
-          {bgStyle === 'grid' && (
-            <gridHelper
-              args={[34, 34, isLight ? '#0284c7' : '#0ea5e9', isLight ? '#cbd5e1' : '#1e293b']}
-              position={[0, -0.28, 0]}
-            />
-          )}
 
           <Suspense fallback={null}>
             <AcceleratorBoardModel
@@ -1191,29 +1198,6 @@ export default function BoltAccelerator3D({ theme = 'dark', isActive = true }) {
             >
               <Box size={13} />
               Wireframe X-Ray
-            </button>
-
-            {/* Background Style Toggle (Grid vs Studio Dark/Light) */}
-            <button
-              onClick={() => setBgStyle(prev => prev === 'grid' ? 'studio' : 'grid')}
-              title="Toggle Grid / Studio Background"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                padding: '0.35rem 0.75rem',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                borderRadius: '8px',
-                border: 'none',
-                cursor: 'pointer',
-                background: bgStyle === 'grid' ? (isLight ? 'rgba(2, 132, 199, 0.15)' : 'rgba(14, 165, 233, 0.2)') : (isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.06)'),
-                color: bgStyle === 'grid' ? (isLight ? '#0284c7' : '#38bdf8') : (isLight ? '#64748b' : '#94a3b8'),
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Grid size={13} />
-              {bgStyle === 'grid' ? 'CAD Grid' : (isLight ? 'Studio Light' : 'Studio Dark')}
             </button>
 
             <div style={{ width: '1px', height: '16px', background: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)', margin: '0 0.2rem' }} />
