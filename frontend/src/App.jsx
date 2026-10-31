@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Server,
   Image as ImageIcon, Settings,
   HelpCircle, Bell, Search, Cpu as CpuIcon, Activity, Network, Droplet,
-  Sun, Moon, Monitor, Bot, Zap, Gauge
+  Sun, Moon, Monitor, Bot, Zap, Gauge, Shield
 } from 'lucide-react'
 
 // Dashboard is eagerly loaded (visible on startup)
@@ -24,6 +24,7 @@ const GraphicsViewer = lazy(() => import('./components/GraphicsViewer'))
 const AIComparisonAgent = lazy(() => import('./components/AIComparisonAgent'))
 const ProjectAIChatbot = lazy(() => import('./components/ProjectAIChatbot'))
 const BoltAccelerator3D = lazy(() => import('./components/BoltAccelerator3D'))
+const TacticalDataCenter3D = lazy(() => import('./components/TacticalDataCenter3D'))
 const MonitoringDashboard = lazy(() => import('./components/MonitoringDashboard'))
 
 const queryClient = new QueryClient({
@@ -78,6 +79,7 @@ function App() {
       import('./components/GraphicsViewer')
       import('./components/ProjectAIChatbot')
       import('./components/BoltAccelerator3D')
+      import('./components/TacticalDataCenter3D')
       import('./components/MonitoringDashboard')
     }
     if (typeof window !== 'undefined') {
@@ -124,6 +126,7 @@ function App() {
     { id: 'water_resource', name: 'Water & Resource', icon: Droplet, component: WaterComputePlanner },
     { id: 'gpu_monitor', name: 'GPU Monitor', icon: Activity, component: GPUMonitor },
     { id: 'graphics', name: 'Graphics Viewer', icon: ImageIcon, component: GraphicsViewer },
+    { id: 'tactical_dc', name: 'Tactical Portable DC', icon: Shield, component: TacticalDataCenter3D },
   ]
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component
